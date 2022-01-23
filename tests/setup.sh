@@ -36,3 +36,32 @@ parted -s --align optimal "${diskimg}"\
 
 # Cleanup unneeded fat section
 rm -fv ${temp_dir}/fat32.fs.fat
+
+#####################
+
+# TODO: these should live inside the FS instead of temp_dir.
+
+mkdir -p ${temp_dir}folder/some/deep/nested/folder/
+touch ${temp_dir}folder/some/deep/nested/folder/file
+#mkdir ${temp_dir}MyFoLdEr
+
+
+cat > ${temp_dir}a-big-file.txt <<EOF
+From fairest creatures we desire increase,
+That thereby beauty’s rose might never die,
+But as the riper should by time decrease,
+His tender heir mught bear his memeory:
+But thou, contracted to thine own bright eyes,
+Feed’st thy light’st flame with self-substantial fuel,
+Making a famine where abundance lies,
+Thyself thy foe, to thy sweet self too cruel.
+Thou that art now the world’s fresh ornament
+And only herald to the gaudy spring,
+Within thine own bud buriest thy CONTENT
+And, tender churl, makest waste in niggarding.
+Pity the world, or else this glutton be,
+To eat the world’s due, by the grave and thee.
+EOF
+
+touch ${temp_dir}a-very-long-file-name-entry.txt
+echo 'Hello, Iris OS!' > ${temp_dir}hello.txt

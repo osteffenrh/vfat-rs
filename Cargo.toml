@@ -1,5 +1,5 @@
 [package]
-name = "ntfs-rs"
+name = "vfat-rs"
 version = "0.1.0"
 authors = ["Federico Ponzi <me@fponzi.me>"]
 edition = "2021"
@@ -9,4 +9,12 @@ edition = "2021"
 [dependencies]
 log = "~0.4"
 snafu = {version = "~0.7", default-features = false}
-binread = {version = "~2.2", default-features = false, features = ["const_generics"]}
+binrw = {version = "~0.8", default-features = false}
+regex = "1.4.6"
+uluru = "1.1.1"
+
+[dev-dependencies]
+env_logger = "~0.8"
+rand = "~0.8"
+serial_test = "0.5.1"
+lazy_static = "~1.4"

@@ -1,6 +1,6 @@
-use ntfs_rs::mbr;
 use std::fs::File;
 use std::io::Read;
+use vfat_rs::mbr;
 
 mod common;
 

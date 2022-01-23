@@ -1,7 +1,7 @@
 use crate::{const_assert_size, error, BlockDevice, SectorId};
-use binread::io::Cursor;
-use binread::BinRead;
-use binread::BinReaderExt;
+use binrw::io::Cursor;
+use binrw::BinRead;
+use binrw::BinReaderExt;
 use log::error;
 
 /// Magic indicating a valid bootsector

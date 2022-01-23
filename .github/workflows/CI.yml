@@ -106,17 +106,17 @@ jobs:
         shell: bash
         run: |
           # TODO:
-          # strip target/${{ matrix.target }}/release/ntfs-rs
+          # strip target/${{ matrix.target }}/release/vfat-rs
 
           cd target/${{ matrix.target }}/release          
-          tar czvf ../../../ntfs-rs-${{ matrix.target }}.tar.gz ntfs-rs
+          tar czvf ../../../vfat-rs-${{ matrix.target }}.tar.gz vfat-rs
           cd -
           
       - name: Publish
         uses: softprops/action-gh-release@v1
         # TODO: if any of the build step fails, the release should be deleted.
         with:
-            files: 'ntfs-rs*'
+            files: 'vfat-rs*'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
