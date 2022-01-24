@@ -35,18 +35,23 @@ parted -s --align optimal "${diskimg}"\
   set 1 boot on
 
 # Cleanup unneeded fat section
-rm -fv ${temp_dir}/fat32.fs.fat
+rm -fv ${temp_dir}fat32.fs.fat
 
 #####################
+######### Write test files
+# 1. Mount the FS:
+dest="/tmp/testmount/"
+mkdir -p $dest
+sudo mount -o loop,offset=$((2048*512)),uid=1000,gid=1000,dmask=0000,fmask=0001 fat32.fs $dest
 
-# TODO: these should live inside the FS instead of temp_dir.
+# Create test files:
+cd ${dest}
 
-mkdir -p ${temp_dir}folder/some/deep/nested/folder/
-touch ${temp_dir}folder/some/deep/nested/folder/file
-#mkdir ${temp_dir}MyFoLdEr
+mkdir -p ${dest}folder/some/deep/nested/folder/
+touch ${dest}folder/some/deep/nested/folder/file
+mkdir ${dest}MyFoLdEr
 
-
-cat > ${temp_dir}a-big-file.txt <<EOF
+cat > ${dest}a-big-file.txt <<EOF
 From fairest creatures we desire increase,
 That thereby beauty’s rose might never die,
 But as the riper should by time decrease,
@@ -63,5 +68,11 @@ Pity the world, or else this glutton be,
 To eat the world’s due, by the grave and thee.
 EOF
 
-touch ${temp_dir}a-very-long-file-name-entry.txt
-echo 'Hello, Iris OS!' > ${temp_dir}hello.txt
+touch ${dest}a-very-long-file-name-entry.txt
+echo 'Hello, Iris OS!' > ${dest}hello.txt
+
+# exit from the mounted fs:
+cd /tmp
+
+## Then unmount the fs, to flush disk writes.
+exec sudo umount $dest

@@ -73,6 +73,7 @@ fn test_read_bios_parameter_block() {
 
 #[test]
 #[serial]
+#[ignore] // TODO:
 fn test_read_file() -> vfat_rs::Result<()> {
     let mut vfat = init_vfat()?;
     let expected_content = "Hello, Iris OS!".to_string();

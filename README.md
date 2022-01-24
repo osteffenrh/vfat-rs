@@ -10,65 +10,11 @@ Depending on how the FAT is constructed:
 * FAT32 maximum : 16 sectors per cluster × 268,173,557 clusters = 2,196,877,778,944 bytes (≈2,046 GB)
 
 
-### From Linux
-The script below creates a new FS with an MBR and a fat32 partition in it.
-```bash 
-# From: https://unix.stackexchange.com/a/527217/61495
-# Filename of resulting disk image
-mkdir /tmp/irisos_fat32/
-cd $_
-diskimg=fat32.fs
-# FS size in megabytes:
-fs_size=260   
-# Desired size in bytes
-size=$((${fs_size}*(1<<20))) 
-# align to next MB (https://www.thomas-krenn.com/en/wiki/Partition_Alignment)
-alignment=$((1<<20))  
-# ceil(size, 1MB):
-size=$(( (size + alignment - 1)/alignment * alignment ))  
-# mkfs.fat requires size as an (undefined) block-count; seem to be units of 1k
-mkfs.fat -C -F32 -n "IRISVOL" "${diskimg}".fat $((size >> 10))
-# insert the filesystem to a new file at offset 1MB
-dd if=${diskimg}.fat of=${diskimg} conv=sparse obs=512 seek=$((${alignment}/512))
-# extend the file by 1MB
-truncate -s "+${alignment}" "${diskimg}"
-# apply partitioning
-parted --align optimal "${diskimg}"\
-  mklabel msdos\
-  mkpart primary fat32 1MiB 100%\
-  set 1 boot on
-# Cleanup unneded fat section
-rm -f ${diskimg}.fat
+## Testing
+To run the setup.sh script, I've added an exception for my user in the sudoers file:
 ```
-You can then mount it:
+fponzi ALL=(ALL) NOPASSWD: /usr/bin/mount,/usr/bin/umount
 ```
-dest=/mnt/test
-# use fdisk -l fat32.fs to find sector size and sector size
-# and then:
-sudo mount -o loop,offset=$((2048*512)) fat32.fs /mnt/test/
-cd ${dest}
-sudo mkdir CaRteLLa
-sudo mkdir folder
-sudo bash -c 'echo "Hello, Iris OS!"> hello.txt'
-sudo touch a-very-long-file-name-entry.txt
-```
-
-### Tests resources:
-To make the tests work, you'll need to copy the CONTENT of test/resources in your mounted filesystem.
-```
-├── a-big-file.txt
-├── a-very-long-file-name-entry.txt
-├── MyFoLdEr
-├── folder
-│        └── some
-│             └── deep
-│                 └── nested
-│                     └── folder
-│                         └── file
-└── hello.txt
-```
-
-
 
 
 ### Utils:
@@ -125,3 +71,7 @@ All tests runs on same filesystem, and test shall not happen in parallel.
 
 ### Useful docs:
 * https://www.win.tue.nl/~aeb/linux/fs/fat/fat-1.html
+
+---
+To mount with 777 permission:
+sudo mount -o loop,offset=$((2048*512)),uid=1000,gid=1000,dmask=0000,fmask=0001 fat32.fs /mnt/test/
