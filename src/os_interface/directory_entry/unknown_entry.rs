@@ -1,5 +1,7 @@
 use crate::const_assert_size;
-use crate::os_interface::directory_entry::{Attributes, EntryId, RegularDirectoryEntry, VfatDirectoryEntry};
+use crate::os_interface::directory_entry::{
+    Attributes, EntryId, RegularDirectoryEntry, VfatDirectoryEntry,
+};
 use core::mem;
 
 #[derive(Debug, Clone)]
