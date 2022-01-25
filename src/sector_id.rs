@@ -6,9 +6,9 @@ use core::ops::Add;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct SectorId(pub u32);
 
-impl Into<u64> for SectorId {
-    fn into(self) -> u64 {
-        self.0 as u64
+impl From<SectorId> for u64 {
+    fn from(sector_id: SectorId) -> Self {
+        sector_id.0 as u64
     }
 }
 

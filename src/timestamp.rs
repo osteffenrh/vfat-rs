@@ -28,7 +28,7 @@ defbit!(
 // 4-0 Seconds/2 (0-29)
 impl VfatTimestamp {
     fn year(&self) -> u32 {
-        self.get_value(Self::YEAR) + 1980 as u32
+        self.get_value(Self::YEAR) + 1980_u32
     }
     fn month(&self) -> u32 {
         self.get_value(Self::MONTH)

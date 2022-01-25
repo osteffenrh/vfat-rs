@@ -6,7 +6,7 @@ pub struct RawFatEntry(pub u32);
 
 impl RawFatEntry {
     pub fn as_buff(self) -> [u8; mem::size_of::<Self>()] {
-        unsafe { mem::transmute(self.0) }
+        self.0.to_ne_bytes()
     }
 }
 

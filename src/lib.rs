@@ -1,11 +1,14 @@
 //! ntfs-rs is a simple ntfs implementation in Rust.
-#![allow(unused_variables)]
-#![allow(dead_code)]
-//#![feature(bool_to_option)]
 #![cfg_attr(not(test), no_std)]
-//#![deny(unsafe_code)]
 #![deny(unaligned_references)]
 //#![deny(missing_docs)]
+//#![deny(unsafe_code)]
+
+// to remove:
+#![allow(unused_variables)]
+#![allow(dead_code)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::blocks_in_if_conditions)]
 
 extern crate alloc;
 
