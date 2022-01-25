@@ -60,7 +60,7 @@ impl VfatFile {
 
 impl Write for VfatFile {
     fn write(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             return Ok(0);
         }
         debug!("Requested write on file.");
@@ -73,7 +73,7 @@ impl Write for VfatFile {
         }
         let mut ccw = self
             .vfat_filesystem
-            .cluster_chain_writer(self.metadata.cluster.clone());
+            .cluster_chain_writer(self.metadata.cluster);
         // TODO: FIXME.
         ccw.seek(self.offset)
             .map_err(|err| binrw::io::ErrorKind::Other)?;
@@ -147,7 +147,7 @@ impl Read for VfatFile {
         }
         let mut ccr = self
             .vfat_filesystem
-            .cluster_chain_reader(self.metadata.cluster.clone());
+            .cluster_chain_reader(self.metadata.cluster);
         info!("Going to seek to:{}", self.offset);
         ccr.seek(self.offset)?;
 

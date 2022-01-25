@@ -38,12 +38,13 @@ impl From<u8> for EntryId {
         }
     }
 }
-impl Into<u8> for EntryId {
-    fn into(self) -> u8 {
-        match self {
-            Self::EndOfEntries => ID_LAST_ENTRY_WAS_LAST,
-            Self::Deleted => ID_DELETED_UNUSED_ENTRY,
-            Self::Valid(id) => id,
+
+impl From<EntryId> for u8 {
+    fn from(entry_id: EntryId) -> Self {
+        match entry_id {
+            EntryId::EndOfEntries => ID_LAST_ENTRY_WAS_LAST,
+            EntryId::Deleted => ID_DELETED_UNUSED_ENTRY,
+            EntryId::Valid(id) => id,
         }
     }
 }
@@ -173,8 +174,8 @@ impl VfatDirectoryEntry {
 
         let current_entry = RegularDirectoryEntry {
             file_name: current_name,
-            file_ext: file_ext.clone(),
-            attributes: attributes.clone(),
+            file_ext,
+            attributes,
             _reseverd_win_nt: 0,
             creation_millis: Default::default(),
             creation_time: VfatTimestamp::new(1385663476),
@@ -322,7 +323,7 @@ impl VfatDirectoryEntry {
     }
     pub(crate) fn convert<const T: usize>(buf: &[u8]) -> [u16; T] {
         let padding = || iter::repeat(0x0000u16);
-        buf.into_iter()
+        buf.iter()
             .map(|v| *v as u16)
             .chain(padding())
             .take(T)
@@ -439,7 +440,7 @@ impl<const T: usize> ToUtf16<T> for &str {
     fn into_utf16(self) -> [u16; T] {
         let padding = || iter::repeat(0x00u16);
         self.as_bytes()
-            .into_iter()
+            .iter()
             .map(|v| *v as u16)
             .chain(padding())
             .take(T)

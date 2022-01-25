@@ -1,4 +1,6 @@
 //! ntfs-rs is a simple ntfs implementation in Rust.
+#![allow(unused_variables)]
+#![allow(dead_code)]
 //#![feature(bool_to_option)]
 #![cfg_attr(not(test), no_std)]
 //#![deny(unsafe_code)]
@@ -329,8 +331,7 @@ impl VfatFS {
         let sector = self.cluster_to_sector(cluster_id);
         info!("Sector: {:?}", sector);
         let mut mutex = self.device.as_ref();
-        let amount_written =
-            mutex.lock(|device| device.write_sector(sector.into(), source_buffer))?;
+        let amount_written = mutex.lock(|device| device.write_sector(sector, source_buffer))?;
         info!("Written: {:?}", amount_written);
         Ok(amount_written)
     }
@@ -385,7 +386,7 @@ impl VfatFS {
         let _amount_read = cluster_reader.read(&mut buf);
         let unknown_entries: UnknownDirectoryEntry = unsafe { mem::transmute(buf) };
         debug!("Unknown entries: {:?}", unknown_entries);
-        let volume_id = VfatDirectoryEntry::from(unknown_entries.clone())
+        let volume_id = VfatDirectoryEntry::from(unknown_entries)
             .into_regular()
             .filter(|regular| regular.is_volume_id())
             .ok_or_else(|| {

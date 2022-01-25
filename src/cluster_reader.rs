@@ -39,7 +39,7 @@ impl ClusterReader {
     ) -> Self {
         Self {
             device,
-            current_sector: start_sector.clone(),
+            current_sector: start_sector,
             offset_byte_in_current_sector: 0,
             start_sector,
             sector_size,
@@ -56,7 +56,7 @@ impl ClusterReader {
     ) -> Self {
         Self {
             device,
-            current_sector: start_sector.clone(),
+            current_sector: start_sector,
             offset_byte_in_current_sector,
             start_sector,
             sector_size,
@@ -68,7 +68,7 @@ impl ClusterReader {
 
 impl binrw::io::Read for ClusterReader {
     fn read(&mut self, buf: &mut [u8]) -> core::result::Result<usize, binrw::io::Error> {
-        if self.current_sector >= self.final_sector || buf.len() == 0 {
+        if self.current_sector >= self.final_sector || buf.is_empty() {
             return Ok(0);
         }
 
@@ -85,7 +85,7 @@ impl binrw::io::Read for ClusterReader {
             let amount_read = mutex
                 .lock(|device| {
                     device.read_sector_offset(
-                        self.current_sector.into(),
+                        self.current_sector,
                         self.offset_byte_in_current_sector,
                         &mut buf[total_amount_read..],
                     )
@@ -96,7 +96,7 @@ impl binrw::io::Read for ClusterReader {
                 self.current_sector, amount_read
             );
             total_amount_read += amount_read;
-            self.offset_byte_in_current_sector = amount_read + self.offset_byte_in_current_sector;
+            self.offset_byte_in_current_sector += amount_read;
             assert!(self.offset_byte_in_current_sector <= self.sector_size);
             if total_amount_read % self.sector_size == 0 {
                 self.current_sector = SectorId(self.current_sector.0 + 1);
@@ -222,7 +222,7 @@ impl ClusterChainReader {
 impl binrw::io::Read for ClusterChainReader {
     /// Read sectors one by one, until the requested buf size is fullfilled.
     fn read(&mut self, buf: &mut [u8]) -> core::result::Result<usize, binrw::io::Error> {
-        if self.current_cluster.is_none() || buf.len() == 0 {
+        if self.current_cluster.is_none() || buf.is_empty() {
             return Ok(0);
         }
 
@@ -230,7 +230,7 @@ impl binrw::io::Read for ClusterChainReader {
         while amount_read < buf.len() && self.current_cluster.is_some() {
             debug!("CCR: amount_read: {}", amount_read);
             // TODO: to allow tracking of last written cluster from external user of this struct
-            self.last_cluster_read = self.current_cluster.clone().unwrap();
+            self.last_cluster_read = self.current_cluster.unwrap();
             let current_amount_read = self.cluster_reader.read(&mut buf[amount_read..])?;
             debug!("CCR: current_amount_read: {}", current_amount_read);
             amount_read += current_amount_read;

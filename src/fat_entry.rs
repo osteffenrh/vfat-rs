@@ -63,10 +63,10 @@ impl From<RawFatEntry> for FatEntry {
         }
     }
 }
-impl Into<RawFatEntry> for FatEntry {
-    fn into(self) -> RawFatEntry {
+impl From<FatEntry> for RawFatEntry {
+    fn from(fat_entry: FatEntry) -> Self {
         use FatEntry::*;
-        let res = match self {
+        let res = match fat_entry {
             FatEntry::Unused => 0x0,
             Reserved(i) => i,
             DataCluster(i) => i,

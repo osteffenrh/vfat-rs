@@ -6,7 +6,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("MBR Error: {error}"))]
-    MbrError {
+    Mbr {
         error: MbrError,
     },
     #[snafu(display("TODO"))]
@@ -18,7 +18,7 @@ pub enum Error {
     BinReadConvFailed {
         source: self::BinRwErrorWrapper,
     },
-    BinRwError {
+    BinRw {
         source: BinRwErrorWrapper,
     },
 }
@@ -34,7 +34,7 @@ impl From<binrw::error::Error> for BinRwErrorWrapper {
 }
 impl From<binrw::error::Error> for Error {
     fn from(err: binrw::Error) -> Self {
-        Error::BinRwError {
+        Error::BinRw {
             source: BinRwErrorWrapper { value: err },
         }
     }

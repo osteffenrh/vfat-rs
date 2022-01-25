@@ -10,8 +10,8 @@ use crate::cluster_writer::ClusterChainWriter;
 use crate::os_interface::directory_entry::{
     Attributes, EntryId, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
 };
-use crate::os_interface::{VfatEntry, VfatFile, VfatMetadata};
-use crate::{cluster_writer, BinReadConvFailed, BinRwErrorWrapper, ClusterId, VfatFS};
+use crate::os_interface::{VfatEntry, VfatMetadata};
+use crate::{cluster_writer, BinRwErrorWrapper, ClusterId, VfatFS};
 use crate::{error, timestamp::VfatTimestamp, SectorId};
 
 pub enum EntryType {
@@ -222,11 +222,10 @@ impl VfatDirectory {
         let mut target_entry = self
             .contents()?
             .into_iter()
-            .filter(|name| {
+            .find(|name| {
                 info!("Checking name: {} == {}", name.metadata.name(), target_name);
                 name.metadata.name() == target_name
             })
-            .next()
             .ok_or(binrw::io::ErrorKind::NotFound) //TODO: fix error conversion
             .map_err(|value| error::Error::BinReadConvFailed {
                 source: BinRwErrorWrapper {
@@ -307,7 +306,7 @@ impl VfatDirectory {
                     lfn_buff.clear();
                 }
                 VfatDirectoryEntry::Regular(regular) => {
-                    let name = if lfn_buff.len() > 0 {
+                    let name = if !lfn_buff.is_empty() {
                         lfn_buff.sort();
                         let ret = lfn_buff
                             .into_iter()
@@ -412,7 +411,7 @@ impl VfatDirectory {
                     }
                     VfatDirectoryEntry::Deleted(_) => lfn_buff.clear(),
                     VfatDirectoryEntry::Regular(regular) => {
-                        let name = if lfn_buff.len() > 0 {
+                        let name = if !lfn_buff.is_empty() {
                             lfn_buff.sort();
                             let ret = lfn_buff
                                 .into_iter()
@@ -440,12 +439,12 @@ impl VfatDirectory {
         }
         error!("Directory update entry {}: file not found!!", target_name);
         //             "VfatDirectory::update entry. Cannot find file to update metadata.",
-        return Err(binrw::io::ErrorKind::NotFound) //TODO: fix error conversion
+        Err(binrw::io::ErrorKind::NotFound) //TODO: fix error conversion
             .map_err(|value| error::Error::BinReadConvFailed {
                 source: BinRwErrorWrapper {
                     value: binrw::io::Error::from(value).into(),
                 },
-            });
+            })
     }
     fn delete_entry(&mut self, entry: VfatEntry) -> error::Result<()> {
         info!(

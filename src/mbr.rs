@@ -61,7 +61,7 @@ impl MasterBootRecord {
                 "Requested partition index: {}, but partition's type is :{}",
                 index, partition.partition_type
             );
-            return Err(error::Error::MbrError {
+            return Err(error::Error::Mbr {
                 error: error::MbrError::InvalidPartition { index },
             });
         }

@@ -63,7 +63,7 @@ impl ClusterWriter {
 
 impl binrw::io::Write for ClusterWriter {
     fn write(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
-        if self.is_over() || buf.len() == 0 {
+        if self.is_over() || buf.is_empty() {
             return Ok(0);
         }
         let mut total_written = 0;
@@ -77,7 +77,7 @@ impl binrw::io::Write for ClusterWriter {
             let amount_written = mutex
                 .lock(|device| {
                     device.write_sector_offset(
-                        self.current_sector.into(),
+                        self.current_sector,
                         self.offset_byte_in_current_sector,
                         &buf[total_written..],
                     )
@@ -86,8 +86,7 @@ impl binrw::io::Write for ClusterWriter {
             info!("CW: amount written: {}", amount_written);
 
             total_written += amount_written;
-            self.offset_byte_in_current_sector =
-                amount_written + self.offset_byte_in_current_sector;
+            self.offset_byte_in_current_sector += amount_written;
             assert!(self.offset_byte_in_current_sector <= self.sector_size);
 
             // FIXME: Is this right?
@@ -224,7 +223,7 @@ impl ClusterChainWriter {
 
 impl binrw::io::Write for ClusterChainWriter {
     fn write(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
-        if self.current_cluster.is_none() || buf.len() == 0 {
+        if self.current_cluster.is_none() || buf.is_empty() {
             info!(
                 "Current cluster is: {:?}. Buf len: {}. Returning...",
                 self.current_cluster,
