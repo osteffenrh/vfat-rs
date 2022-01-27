@@ -82,15 +82,13 @@ impl binrw::io::Read for ClusterReader {
                 self.current_sector,
                 total_amount_read + self.offset_byte_in_current_sector
             );
-            let amount_read = mutex
-                .lock(|device| {
-                    device.read_sector_offset(
-                        self.current_sector,
-                        self.offset_byte_in_current_sector,
-                        &mut buf[total_amount_read..],
-                    )
-                })
-                .map_err(|err| binrw::io::ErrorKind::Other)?; //TODO
+            let amount_read = mutex.lock(|device| {
+                device.read_sector_offset(
+                    self.current_sector,
+                    self.offset_byte_in_current_sector,
+                    &mut buf[total_amount_read..],
+                )
+            })?;
             debug!(
                 "ClusterReader: Current Sector: {}, Amount read: {}",
                 self.current_sector, amount_read

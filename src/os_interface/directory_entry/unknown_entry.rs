@@ -23,6 +23,9 @@ impl UnknownDirectoryEntry {
         let vfat_entry = VfatDirectoryEntry::from(self);
         matches!(vfat_entry, VfatDirectoryEntry::EndOfEntries(_))
     }
+    pub fn last_entry(&self) -> bool {
+        self.is_end_of_entries()
+    }
     pub fn set_id(&mut self, entry_id: EntryId) {
         self.id = entry_id.into();
     }

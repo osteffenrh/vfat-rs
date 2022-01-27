@@ -1,8 +1,6 @@
 use crate::os_interface::{VfatDirectory, VfatFile, VfatMetadata};
 use crate::VfatFS;
 
-/// TODO: Maybe movethis EntryKind to the trait? In this way would allow matching on it instead of
-/// elseif on is_dir is_file.
 #[derive(Debug)]
 enum EntryKind {
     File,

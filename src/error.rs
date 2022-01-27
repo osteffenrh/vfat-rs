@@ -1,9 +1,11 @@
+use alloc::string::String;
 use binrw::io::ErrorKind;
 use snafu::prelude::*;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
 pub enum Error {
     #[snafu(display("MBR Error: {error}"))]
     Mbr {
@@ -21,7 +23,22 @@ pub enum Error {
     BinRw {
         source: BinRwErrorWrapper,
     },
+
+    #[snafu(display("Impossible delete non empty directory: {}", target))]
+    NonEmptyDirectory {
+        target: String,
+    },
+    #[snafu(display("File not found: '{}'", target))]
+    FileNotFound {
+        target: String,
+    },
+
+    #[snafu(display("Cannot delete pseudo directory: '{}'", target))]
+    CannotDeletePseudoDir {
+        target: String,
+    },
 }
+
 #[derive(Debug, Snafu)]
 #[snafu(display("BinRwErrorWrapper: {value}"))]
 pub struct BinRwErrorWrapper {

@@ -5,6 +5,7 @@ use binrw::io::{Read, Write};
 use core::mem;
 
 use log::{debug, error, info};
+use snafu::ensure;
 
 use crate::cluster_writer::ClusterChainWriter;
 use crate::os_interface::directory_entry::{
@@ -116,8 +117,8 @@ impl VfatDirectory {
             metadata.cluster,
             Self::attributes_from_entry(&entry_type),
         );
-
-        let found = self.find_empty_spots_with_cluster(entries.len())?;
+        let spots_needed = entries.len();
+        let found = self.find_empty_spots_with_cluster(spots_needed)?;
         let (found_spot_start_index, cluster_id) = match found {
             Some(spot) => spot,
             None => {
@@ -168,12 +169,7 @@ impl VfatDirectory {
         for unknown_entry in entries.into_iter() {
             let entry: [u8; mem::size_of::<UnknownDirectoryEntry>()] =
                 unsafe { mem::transmute(unknown_entry) };
-            ccw.write(&entry)
-                .map_err(|value| error::Error::BinReadConvFailed {
-                    source: BinRwErrorWrapper {
-                        value: value.into(),
-                    },
-                })?;
+            ccw.write(&entry)?;
         }
 
         if let EntryType::Directory = entry_type {
@@ -208,29 +204,22 @@ impl VfatDirectory {
         const PSEUDO_PARENT_FOLDER: &str = "..";
         const PSEUDO_FOLDERS: &[&str; 2] = &[PSEUDO_PARENT_FOLDER, PSEUDO_CURRENT_FOLDER];
 
-        if PSEUDO_FOLDERS.contains(&target_name.as_str()) {
-            // TODO: "Impossible to delete pseudo directory ('.' nor '..')."
-            return Err(binrw::io::Error::from(binrw::io::ErrorKind::InvalidInput)).map_err(
-                |value| error::Error::BinReadConvFailed {
-                    source: BinRwErrorWrapper {
-                        value: value.into(),
-                    },
-                },
-            );
-        }
+        ensure!(
+            !PSEUDO_FOLDERS.contains(&target_name.as_str()),
+            error::CannotDeletePseudoDirSnafu {
+                target: target_name,
+            }
+        );
 
         let mut target_entry = self
             .contents()?
             .into_iter()
             .find(|name| {
-                info!("Checking name: {} == {}", name.metadata.name(), target_name);
+                debug!("Checking name: {} == {}", name.metadata.name(), target_name);
                 name.metadata.name() == target_name
             })
-            .ok_or(binrw::io::ErrorKind::NotFound) //TODO: fix error conversion
-            .map_err(|value| error::Error::BinReadConvFailed {
-                source: BinRwErrorWrapper {
-                    value: binrw::io::Error::from(value).into(),
-                },
+            .ok_or(error::Error::FileNotFound {
+                target: target_name,
             })?;
 
         info!("Found target entry: {:?}", target_entry);
@@ -238,14 +227,11 @@ impl VfatDirectory {
             let directory = target_entry.into_directory().unwrap();
             if directory.contents()?.len() > 2 {
                 // "Impossible delete non empty directory."
-                return Err(binrw::io::ErrorKind::NotFound) //TODO: fix error conversion
-                    .map_err(|value| error::Error::BinReadConvFailed {
-                        source: BinRwErrorWrapper {
-                            value: binrw::io::Error::from(value).into(),
-                        },
-                    });
+                return Err(error::Error::NonEmptyDirectory {
+                    target: directory.metadata.name().to_string(),
+                });
             }
-            info!("Target entry is a directory with no contents. Starting actual deletion!");
+            info!("Target entry is a directory with no contents. It's safe to delete.");
             target_entry = directory.into();
         }
         self.delete_entry(target_entry)
@@ -438,13 +424,9 @@ impl VfatDirectory {
             }
         }
         error!("Directory update entry {}: file not found!!", target_name);
-        //             "VfatDirectory::update entry. Cannot find file to update metadata.",
-        Err(binrw::io::ErrorKind::NotFound) //TODO: fix error conversion
-            .map_err(|value| error::Error::BinReadConvFailed {
-                source: BinRwErrorWrapper {
-                    value: binrw::io::Error::from(value).into(),
-                },
-            })
+        Err(error::Error::FileNotFound {
+            target: target_name,
+        })
     }
     fn delete_entry(&mut self, entry: VfatEntry) -> error::Result<()> {
         info!(
@@ -501,6 +483,7 @@ impl VfatDirectory {
         &self,
         spots_needed: usize,
     ) -> error::Result<Option<(usize, ClusterId)>> {
+        assert!(spots_needed > 0);
         // TODO: this assumes sector size...
         const SECTOR_SIZE: usize = 512;
         const ENTRIES_AMOUNT: usize = SECTOR_SIZE / mem::size_of::<UnknownDirectoryEntry>();
@@ -529,7 +512,7 @@ impl VfatDirectory {
             let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
                 unsafe { mem::transmute(buff) };
             for (index, entry) in unknown_entries.iter().enumerate() {
-                if entry.is_end_of_entries() {
+                if entry.last_entry() {
                     if start_cluster.is_none() {
                         start_cluster = Some(cluster_chain_reader.last_cluster_read);
                         start_index = index;

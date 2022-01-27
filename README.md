@@ -11,10 +11,13 @@ Depending on how the FAT is constructed:
 
 
 ## Testing
+All tests runs on same filesystem, and test shall not happen in parallel (for now!).
+
 To run the setup.sh script, I've added an exception for my user in the sudoers file:
 ```
 fponzi ALL=(ALL) NOPASSWD: /usr/bin/mount,/usr/bin/umount
 ```
+On github actions (CI) it just works, because the user has passwordless sudo.
 
 
 ### Utils:
@@ -65,9 +68,6 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
   This case should be taken care of by the application using this library.
 
 
-### Testing
-For vfat integration test, run with `RUST_TEST_TASKS=1`.
-All tests runs on same filesystem, and test shall not happen in parallel.
 
 ### Useful docs:
 * https://www.win.tue.nl/~aeb/linux/fs/fat/fat-1.html
