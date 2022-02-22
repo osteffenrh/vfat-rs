@@ -8,7 +8,7 @@ pub fn cluster_to_sector(
     sectors_per_cluster: u32,
     data_start_sector: SectorId,
 ) -> SectorId {
-    let selected_sector = (cluster.as_u32() - 2) * sectors_per_cluster;
+    let selected_sector = (u32::from(cluster) - 2) * sectors_per_cluster;
     let sect = data_start_sector + selected_sector;
     SectorId(sect)
 }

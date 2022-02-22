@@ -1,5 +1,5 @@
 //! ntfs-rs is a simple ntfs implementation in Rust.
-#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![deny(unaligned_references)]
 //#![deny(missing_docs)]
 //#![deny(unsafe_code)]
@@ -38,6 +38,7 @@ pub mod mbr;
 mod os_interface;
 pub mod sector_id;
 mod timestamp;
+mod traits;
 mod utils;
 
 pub use crate::cache::CachedPartition;
@@ -118,7 +119,7 @@ impl VfatFS {
         let data_start_sector = SectorId(data_start_sector);
 
         let sectors_per_cluster = full_ebpb.bpb.sectors_per_cluster as u32;
-        let root_cluster = ClusterId(full_ebpb.extended.root_cluster);
+        let root_cluster = ClusterId::new(full_ebpb.extended.root_cluster);
         let eoc_marker = Self::read_end_of_chain_marker(&mut device, fat_start_sector)?;
         let sector_size = device.sector_size();
         let cached_partition = CachedPartition::new(device);
@@ -164,7 +165,8 @@ impl VfatFS {
     ///
     /// To do so, it uses some useful info from the BPB section.
     pub(crate) fn cluster_to_sector(&self, cluster: ClusterId) -> SectorId {
-        let selected_sector = cluster.as_u32().saturating_sub(2) * self.sectors_per_cluster as u32;
+        let selected_sector =
+            u32::from(cluster).saturating_sub(2) * self.sectors_per_cluster as u32;
         let sect = self.data_start_sector.0 as u32 + selected_sector as u32;
         SectorId(sect)
     }
@@ -192,7 +194,7 @@ impl VfatFS {
                 debug!("(cid: {:?}) Fat entry: {:?}", FatEntry::from(*raw), cid);
                 if let FatEntry::Unused = FatEntry::from(*raw) {
                     debug!("Found an unused cluster with id: {}", cid);
-                    return Ok(Some(ClusterId((ENTRIES_BUF_SIZE as u32 * i) + id as u32)));
+                    return Ok(Some(ClusterId::new((ENTRIES_BUF_SIZE as u32 * i) + id as u32)));
                 }
             }
         }

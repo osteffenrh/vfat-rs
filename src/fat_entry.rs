@@ -39,7 +39,7 @@ pub enum FatEntry {
 
 impl FatEntry {
     pub(crate) fn from_chain(next: ClusterId) -> Self {
-        Self::DataCluster(next.as_u32())
+        Self::DataCluster(next.into())
     }
     pub fn as_buff(self) -> [u8; mem::size_of::<RawFatEntry>()] {
         let raw_fat: RawFatEntry = self.into();

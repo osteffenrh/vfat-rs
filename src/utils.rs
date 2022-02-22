@@ -13,10 +13,10 @@ pub fn get_params(
     let fat_entries_per_sector = sector_size / mem::size_of::<RawFatEntry>();
     // In which sector is this cid contained. Cid: 222 / 18 = 12.3333
     //TODO: check floor
-    let containing_sector = (cluster_id.0 as f64 / fat_entries_per_sector as f64) as u32;
+    let containing_sector = (f64::from(cluster_id) / fat_entries_per_sector as f64) as u32;
     // The sector is 12, now let's calculate the offset in that sector: 222 % 18 = 6.
     // TODO: check floor
-    let offset_in_sector = ((cluster_id.0 as f64 % fat_entries_per_sector as f64) as usize)
+    let offset_in_sector = ((f64::from(cluster_id) % fat_entries_per_sector as f64) as usize)
         .checked_mul(mem::size_of::<RawFatEntry>())
         .ok_or(CheckedMulFailed)?; //Todo: make nicer.
 

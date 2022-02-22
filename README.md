@@ -73,5 +73,9 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
 * https://www.win.tue.nl/~aeb/linux/fs/fat/fat-1.html
 
 ---
+
 To mount with 777 permission:
+
+```
 sudo mount -o loop,offset=$((2048*512)),uid=1000,gid=1000,dmask=0000,fmask=0001 fat32.fs /mnt/test/
+```

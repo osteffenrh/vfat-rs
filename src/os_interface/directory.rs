@@ -82,7 +82,7 @@ impl VfatDirectory {
         let path = Path::new(format!("{}{}", self.metadata.path(), entry_name));
         let attributes = Self::attributes_from_entry(entry_type);
         let cluster_id = match entry_type {
-            EntryType::File => ClusterId(0),
+            EntryType::File => ClusterId::new(0),
             EntryType::Directory => self.vfat_filesystem.allocate_cluster_new_entry()?,
         };
         info!("Going to use as cluster id: {}", cluster_id);
@@ -174,7 +174,7 @@ impl VfatDirectory {
 
         if let EntryType::Directory = entry_type {
             let entries =
-                VfatDirectoryEntry::create_pseudo_dir_entries(metadata.cluster, ClusterId(0));
+                VfatDirectoryEntry::create_pseudo_dir_entries(metadata.cluster, ClusterId::new(0));
             let mut cw = self
                 .vfat_filesystem
                 .cluster_writer(metadata.cluster, SectorId(0), 0);

@@ -1,21 +1,29 @@
 use core::{fmt, ops};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct ClusterId(pub(crate) u32);
+pub struct ClusterId(u32);
+impl From<ClusterId> for u32 {
+    fn from(cid: ClusterId) -> Self {
+        cid.0
+    }
+}
+impl From<ClusterId> for f64 {
+    fn from(cid: ClusterId) -> Self {
+        cid.0 as u64 as f64
+    }
+}
 
 impl ClusterId {
-    pub(crate) fn as_u32(&self) -> u32 {
-        self.0
-    }
-
     pub fn new(id: u32) -> Self {
         ClusterId(id)
     }
 
+    // Returns the high and the low part of this cluster id
     pub fn into_high_low(self) -> (u16, u16) {
         ((self.0 >> 16) as u16, (self.0 & 0xFFFF) as u16)
     }
 
+    // Builds back the clusterid from high and low parts.
     pub fn from_high_low(high: u16, low: u16) -> Self {
         let raw_bytes: [u8; 4] = [
             (high >> 8) as u8,
@@ -41,5 +49,19 @@ where
 
     fn sub(self, other: T) -> Self::Output {
         self.0 as i64 - other.into()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ClusterId;
+
+    #[test]
+    fn test_high_low() {
+        let n = 0b1000_1000_0001_0001_1000_1000_0001_0001;
+        let high = 0b1000_1000_0001_0001;
+        let low = high;
+        assert_eq!((high, low), ClusterId::new(n).into_high_low(), "i: {}", n);
+        assert_eq!(ClusterId::from_high_low(high, low).0, n);
     }
 }

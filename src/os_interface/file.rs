@@ -64,7 +64,7 @@ impl Write for VfatFile {
             return Ok(0);
         }
         debug!("Requested write on file.");
-        if self.metadata.cluster == ClusterId(0) {
+        if self.metadata.cluster == ClusterId::new(0) {
             debug!("File's cluster is none.");
             self.metadata.cluster = self.vfat_filesystem.allocate_cluster_new_entry()?;
             debug!("Allocated cluster to file: {}", self.metadata.cluster);
@@ -136,7 +136,7 @@ impl Read for VfatFile {
         // it should read at most the buf size or the missing file data.
         let amount_to_read = cmp::min(buf.len(), self.metadata.size().saturating_sub(self.offset));
         if amount_to_read == 0
-            || self.metadata.cluster == ClusterId(0)
+            || self.metadata.cluster == ClusterId::new(0)
             || self.offset > self.metadata.size as usize
         {
             info!(

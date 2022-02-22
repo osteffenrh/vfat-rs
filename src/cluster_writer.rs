@@ -232,7 +232,9 @@ impl binrw::io::Write for ClusterChainWriter {
             return Ok(0);
         }
         assert!(
-            self.current_cluster.filter(|id| id.0 != 0).is_some(),
+            self.current_cluster
+                .filter(|id| u32::from(*id) != 0)
+                .is_some(),
             "current cluster is ClusterId(0)."
         );
         debug!("CCW: Current cluster: {:?}", self.current_cluster);

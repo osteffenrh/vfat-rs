@@ -193,8 +193,8 @@ impl VfatDirectoryEntry {
         // it uses ClusterId(0) instead of ClusterId(2).
         // I'm not sure the reason behind it, but I need this otherwise the directory is not interpreted
         // correctly.
-        let (parent_high, parent_low) = if parent_dir == ClusterId(2) {
-            ClusterId(0)
+        let (parent_high, parent_low) = if parent_dir == ClusterId::new(2) {
+            ClusterId::new(0)
         } else {
             parent_dir
         }
