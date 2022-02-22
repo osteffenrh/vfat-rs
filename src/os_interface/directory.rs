@@ -1,18 +1,18 @@
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::{IntoIter, Vec};
-use binrw::io::{Read, Write};
 use core::mem;
 
 use log::{debug, error, info};
 use snafu::ensure;
 
+use crate::cluster_reader::ClusterChainReader;
 use crate::cluster_writer::ClusterChainWriter;
 use crate::os_interface::directory_entry::{
     Attributes, EntryId, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
 };
 use crate::os_interface::{VfatEntry, VfatMetadata};
-use crate::{cluster_writer, BinRwErrorWrapper, ClusterId, VfatFS};
+use crate::{cluster_writer, ClusterId, VfatFS};
 use crate::{error, timestamp::VfatTimestamp, SectorId};
 
 pub enum EntryType {
@@ -180,12 +180,7 @@ impl VfatDirectory {
                 .cluster_writer(metadata.cluster, SectorId(0), 0);
             let buf: [u8; mem::size_of::<UnknownDirectoryEntry>() * 2] =
                 unsafe { mem::transmute(entries) };
-            cw.write(&buf)
-                .map_err(|value| error::Error::BinReadConvFailed {
-                    source: BinRwErrorWrapper {
-                        value: value.into(),
-                    },
-                })?;
+            cw.write(&buf)?;
         }
 
         Ok(match entry_type {
@@ -218,16 +213,15 @@ impl VfatDirectory {
                 debug!("Checking name: {} == {}", name.metadata.name(), target_name);
                 name.metadata.name() == target_name
             })
-            .ok_or(error::Error::FileNotFound {
+            .ok_or(error::VfatRsError::FileNotFound {
                 target: target_name,
             })?;
 
         info!("Found target entry: {:?}", target_entry);
         if target_entry.is_dir() {
-            let directory = target_entry.into_directory().unwrap();
+            let directory = target_entry.into_directory_unchecked();
             if directory.contents()?.len() > 2 {
-                // "Impossible delete non empty directory."
-                return Err(error::Error::NonEmptyDirectory {
+                return Err(error::VfatRsError::NonEmptyDirectory {
                     target: directory.metadata.name().to_string(),
                 });
             }
@@ -252,13 +246,7 @@ impl VfatDirectory {
         let mut entries = Vec::new();
 
         loop {
-            if 0 == cluster_chain_reader.read(&mut buf).map_err(|value| {
-                error::Error::BinReadConvFailed {
-                    source: BinRwErrorWrapper {
-                        value: value.into(),
-                    },
-                }
-            })? {
+            if 0 == cluster_chain_reader.read(&mut buf)? {
                 break;
             }
             let unknown_entries: [UnknownDirectoryEntry;
@@ -353,6 +341,11 @@ impl VfatDirectory {
 }
 
 impl VfatDirectory {
+    fn cluster_chain_reader(&self) -> ClusterChainReader {
+        self.vfat_filesystem
+            .cluster_chain_reader(self.metadata.cluster)
+    }
+
     // TODO: Currently this doesn't support renaming file, just updating metadatas...
     fn update_entry_inner(
         &mut self,
@@ -366,17 +359,9 @@ impl VfatDirectory {
 
         let mut lfn_buff: Vec<(u8, String)> = Vec::new();
 
-        let mut cluster_chain_reader = self
-            .vfat_filesystem
-            .cluster_chain_reader(self.metadata.cluster);
+        let mut cluster_chain_reader = self.cluster_chain_reader();
         loop {
-            if 0 == cluster_chain_reader.read(&mut buf).map_err(|value| {
-                error::Error::BinReadConvFailed {
-                    source: BinRwErrorWrapper {
-                        value: value.into(),
-                    },
-                }
-            })? {
+            if 0 == cluster_chain_reader.read(&mut buf)? {
                 info!("Cluster chain reader is over.");
                 break;
             }
@@ -424,7 +409,7 @@ impl VfatDirectory {
             }
         }
         error!("Directory update entry {}: file not found!!", target_name);
-        Err(error::Error::FileNotFound {
+        Err(error::VfatRsError::FileNotFound {
             target: target_name,
         })
     }
@@ -469,12 +454,7 @@ impl VfatDirectory {
             SectorId(containing_sector),
             offset_in_sector,
         );
-        ccw.write(&buf)
-            .map_err(|value| error::Error::BinReadConvFailed {
-                source: BinRwErrorWrapper {
-                    value: value.into(),
-                },
-            })?;
+        ccw.write(&buf)?;
         Ok(())
     }
     /// Searches for `spots_needed` in all the clusters allocated to this directory
@@ -501,14 +481,7 @@ impl VfatDirectory {
         let mut start_cluster = None;
         let mut start_index = 0;
 
-        while cluster_chain_reader.read(&mut buff).map_err(|value| {
-            error::Error::BinReadConvFailed {
-                source: BinRwErrorWrapper {
-                    value: value.into(),
-                },
-            }
-        })? > 0
-        {
+        while cluster_chain_reader.read(&mut buff)? > 0 {
             let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
                 unsafe { mem::transmute(buff) };
             for (index, entry) in unknown_entries.iter().enumerate() {

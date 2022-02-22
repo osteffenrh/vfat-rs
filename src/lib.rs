@@ -14,12 +14,11 @@ extern crate alloc;
 
 use crate::extended_bios_parameter_block::FullExtendedBIOSParameterBlock;
 use alloc::sync::Arc;
-use binrw::io::{Cursor, Error, Read};
+use binrw::io::Cursor;
 use binrw::BinReaderExt;
 use core::{fmt, mem};
 use log::{debug, info};
 
-mod api;
 mod cache;
 mod cluster_id;
 mod cluster_reader;
@@ -38,14 +37,12 @@ pub mod mbr;
 mod os_interface;
 pub mod sector_id;
 mod timestamp;
-mod traits;
 mod utils;
 
 pub use crate::cache::CachedPartition;
 pub use crate::cluster_id::ClusterId;
 pub use crate::device::BlockDevice;
-use crate::error::BinRwErrorWrapper;
-use crate::error::Error::{BinReadConvFailed, FreeClusterNotFound};
+use crate::error::VfatRsError::FreeClusterNotFound;
 use crate::fat_entry::FatEntry;
 pub use crate::fat_entry::RawFatEntry;
 pub use crate::lock::{MutexTrait, NullLock};
@@ -54,7 +51,9 @@ use crate::os_interface::directory_entry::{
 };
 pub use crate::os_interface::EntryType;
 pub use crate::os_interface::Path;
-use crate::os_interface::{VfatDirectory, VfatEntry, VfatMetadata};
+
+pub use crate::os_interface::{VfatDirectory, VfatEntry, VfatMetadata, VfatMetadataTrait};
+pub use crate::timestamp::VfatTimestamp;
 pub use error::Result;
 use sector_id::SectorId;
 
@@ -99,10 +98,7 @@ impl VfatFS {
     ) -> error::Result<FullExtendedBIOSParameterBlock> {
         let mut buff = [0u8; 512];
         device.read_sector(start_sector.into(), &mut buff)?;
-        Cursor::new(&buff)
-            .read_ne()
-            .map_err(BinRwErrorWrapper::from)
-            .map_err(|err| BinReadConvFailed { source: err })
+        Ok(Cursor::new(&buff).read_ne()?)
     }
 
     /// start_sector: Partition's start sector, or "Entry Offset Sector".
@@ -194,7 +190,9 @@ impl VfatFS {
                 debug!("(cid: {:?}) Fat entry: {:?}", FatEntry::from(*raw), cid);
                 if let FatEntry::Unused = FatEntry::from(*raw) {
                     debug!("Found an unused cluster with id: {}", cid);
-                    return Ok(Some(ClusterId::new((ENTRIES_BUF_SIZE as u32 * i) + id as u32)));
+                    return Ok(Some(ClusterId::new(
+                        (ENTRIES_BUF_SIZE as u32 * i) + id as u32,
+                    )));
                 }
             }
         }
@@ -327,23 +325,11 @@ impl VfatFS {
             self.fat_start_sector,
         )
     }
-    pub fn write_cluster_content(
-        &self,
-        cluster_id: ClusterId,
-        source_buffer: &[u8],
-    ) -> error::Result<usize> {
-        info!("Requested write of cluster: {}", cluster_id);
-        let sector = self.cluster_to_sector(cluster_id);
-        info!("Sector: {:?}", sector);
-        let mut mutex = self.device.as_ref();
-        let amount_written = mutex.lock(|device| device.write_sector(sector, source_buffer))?;
-        info!("Written: {:?}", amount_written);
-        Ok(amount_written)
-    }
+
     /// p should start with `/`.
     /// TODO: test.
     /// Test with a path to a file, test with a path to root.
-    pub fn get_path(&mut self, path: Path) -> core::result::Result<VfatEntry, Error> {
+    pub fn get_path(&mut self, path: Path) -> Result<VfatEntry> {
         info!("FS: requested path: {:?}", path);
         if path == Path::new("/") {
             return self.get_root().map(From::from);
@@ -353,9 +339,7 @@ impl VfatFS {
         path_iter.next();
         for sub_path in path_iter {
             info!("Visiting path: {}", sub_path);
-            let directory = current_entry
-                .into_directory()
-                .ok_or_else(|| binrw::io::Error::from(binrw::io::ErrorKind::NotFound))?;
+            let directory = current_entry.into_directory_or_not_found()?;
             let directory_iter = directory.iter();
             let matches: Option<VfatEntry> = directory_iter
                 .filter(|entry| {
@@ -369,21 +353,22 @@ impl VfatFS {
                 .last();
             current_entry = matches.ok_or_else(|| {
                 info!("Matches for {} is empty: path not found!", sub_path);
-                binrw::io::Error::from(binrw::io::ErrorKind::NotFound)
+                error::VfatRsError::EntryNotFound {
+                    target: sub_path.into(),
+                }
             })?;
         }
         Ok(current_entry)
     }
 
-    pub fn path_exists(&mut self, path: Path) -> core::result::Result<bool, binrw::io::Error> {
-        let entry = self.get_path(path);
+    pub fn path_exists(&mut self, path: Path) -> Result<bool> {
+        let entry = self.get_path(path).map(|_| true);
         match entry {
-            Err(error) if matches!(error.kind(), binrw::io::ErrorKind::NotFound) => Ok(false),
-            Ok(_) => Ok(true),
-            Err(err) => Err(err),
+            Err(error) if matches!(error, error::VfatRsError::EntryNotFound { .. }) => Ok(false),
+            x => x,
         }
     }
-    pub fn get_root(&mut self) -> core::result::Result<VfatDirectory, binrw::io::Error> {
+    pub fn get_root(&mut self) -> Result<VfatDirectory> {
         const UNKNOWN_ENTRIES: usize = 1;
         const BUF_SIZE: usize = UNKNOWN_ENTRIES * mem::size_of::<UnknownDirectoryEntry>();
         let mut buf = [0; BUF_SIZE];
@@ -410,6 +395,7 @@ impl VfatFS {
         );
         Ok(VfatDirectory::new(self.clone(), metadata))
     }
+
     fn get_canonical_name() -> &'static str {
         "VFAT/FAT32"
     }

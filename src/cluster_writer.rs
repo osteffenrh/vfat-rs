@@ -1,6 +1,6 @@
 use crate::{
-    error, fat_reader, ArcMutex, BlockDevice, CachedPartition, ClusterId, MutexTrait, SectorId,
-    VfatFS,
+    error, fat_reader, ArcMutex, BlockDevice, CachedPartition, ClusterId, MutexTrait, Result,
+    SectorId, VfatFS,
 };
 use log::{debug, info};
 
@@ -59,10 +59,8 @@ impl ClusterWriter {
     fn is_over(&self) -> bool {
         self.current_sector >= self.final_sector
     }
-}
 
-impl binrw::io::Write for ClusterWriter {
-    fn write(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
+    pub fn write(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
         if self.is_over() || buf.is_empty() {
             return Ok(0);
         }
@@ -219,10 +217,7 @@ impl ClusterChainWriter {
                 .map(Option::from)
         })
     }
-}
-
-impl binrw::io::Write for ClusterChainWriter {
-    fn write(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
+    pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         if self.current_cluster.is_none() || buf.is_empty() {
             info!(
                 "Current cluster is: {:?}. Buf len: {}. Returning...",
@@ -261,7 +256,7 @@ impl binrw::io::Write for ClusterChainWriter {
         Ok(amount_written)
     }
 
-    fn flush(&mut self) -> core::result::Result<(), binrw::io::Error> {
+    fn flush(&mut self) -> Result<()> {
         let mut mutex = self.vfat_filesystem.device.as_ref();
         Ok(mutex
             .lock(|device| device.flush())

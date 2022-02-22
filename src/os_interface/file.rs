@@ -1,10 +1,10 @@
+use binrw::io::{SeekFrom, Write};
 use core::cmp;
 
-use binrw::io::{Read, Seek, SeekFrom, Write};
 use log::{debug, info};
 
 use crate::os_interface::VfatMetadata;
-use crate::{error, ClusterId, MutexTrait, VfatFS};
+use crate::{error, ClusterId, MutexTrait, Result, VfatFS};
 
 /// A File representation in a VfatFilesystem.
 //#[derive(Clone)]
@@ -27,7 +27,7 @@ impl VfatFile {
         &self.metadata
     }
 
-    fn update_file_size(&mut self, amount_written: usize) -> error::Result<()> {
+    pub fn update_file_size(&mut self, amount_written: usize) -> error::Result<()> {
         if self.offset + amount_written <= self.metadata.size as usize {
             return Ok(());
         }
@@ -43,7 +43,8 @@ impl VfatFile {
         );
         self.update_metadata()
     }
-    fn update_metadata(&mut self) -> error::Result<()> {
+
+    pub fn update_metadata(&mut self) -> error::Result<()> {
         debug!("Going to update metadata on disk...");
         self.vfat_filesystem
             .get_path(self.metadata.parent().clone())?
@@ -51,15 +52,8 @@ impl VfatFile {
             .unwrap()
             .update_entry(self.metadata.clone())
     }
-}
-impl VfatFile {
-    fn sync(&mut self) -> error::Result<()> {
-        unimplemented!()
-    }
-}
 
-impl Write for VfatFile {
-    fn write(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
+    pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         if buf.is_empty() {
             return Ok(0);
         }
@@ -91,24 +85,23 @@ impl Write for VfatFile {
         Ok(amount_written)
     }
 
-    fn flush(&mut self) -> core::result::Result<(), binrw::io::Error> {
+    pub fn flush(&mut self) -> Result<()> {
         let mut mutex = self.vfat_filesystem.device.as_ref();
-        Ok(mutex.lock(|dev| dev.flush())?)
+        mutex.lock(|dev| dev.flush())
     }
-}
-impl Seek for VfatFile {
-    fn seek(&mut self, pos: SeekFrom) -> core::result::Result<u64, binrw::io::Error> {
+
+    pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         match pos {
             SeekFrom::Start(val) => {
                 self.offset = val as usize;
             }
             SeekFrom::End(val) => {
                 if self.metadata.size as i64 + val < 0 {
-                    // TODO: "Invalid argument - offset cannot be less then zero.",
                     return Err(binrw::io::Error::new(
                         binrw::io::ErrorKind::InvalidInput,
                         "Invalid argument - offset cannot be less then zero.",
-                    ));
+                    )
+                    .into());
                 }
                 debug!(
                     "Seek from end, size: {}, movement: {}",
@@ -121,18 +114,15 @@ impl Seek for VfatFile {
                     return Err(binrw::io::Error::new(
                         binrw::io::ErrorKind::InvalidInput,
                         "Invalid argument - offset cannot be less then zero.",
-                    ));
+                    )
+                    .into());
                 }
                 self.offset = (self.offset as i64 + val) as usize
             }
         }
         Ok(self.offset as u64)
     }
-}
-
-/// The read will actually pull out data from the file
-impl Read for VfatFile {
-    fn read(&mut self, mut buf: &mut [u8]) -> core::result::Result<usize, binrw::io::Error> {
+    pub fn read(&mut self, mut buf: &mut [u8]) -> Result<usize> {
         // it should read at most the buf size or the missing file data.
         let amount_to_read = cmp::min(buf.len(), self.metadata.size().saturating_sub(self.offset));
         if amount_to_read == 0
@@ -159,5 +149,19 @@ impl Read for VfatFile {
         let amount_read = ccr.read(buf)?;
         self.offset += amount_read;
         Ok(amount_read)
+    }
+
+    fn sync(&mut self) -> error::Result<()> {
+        unimplemented!()
+    }
+}
+
+impl Write for VfatFile {
+    fn write(&mut self, buf: &[u8]) -> binrw::io::Result<usize> {
+        Ok(self.write(buf)?)
+    }
+
+    fn flush(&mut self) -> binrw::io::Result<()> {
+        Ok(self.flush()?)
     }
 }

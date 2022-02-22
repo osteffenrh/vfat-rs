@@ -1,10 +1,36 @@
 use crate::os_interface::{VfatDirectory, VfatFile, VfatMetadata};
-use crate::VfatFS;
+use crate::timestamp::VfatTimestamp;
+use crate::{Result, VfatFS};
 
 #[derive(Debug)]
 enum EntryKind {
     File,
     Directory,
+}
+pub trait VfatMetadataTrait {
+    fn metadata(&self) -> &VfatMetadata;
+    fn name(&self) -> &str {
+        self.metadata().name()
+    }
+    fn creation(&self) -> VfatTimestamp {
+        self.metadata().creation().unwrap()
+    }
+}
+
+impl VfatMetadataTrait for VfatFile {
+    fn metadata(&self) -> &VfatMetadata {
+        &self.metadata
+    }
+}
+impl VfatMetadataTrait for VfatDirectory {
+    fn metadata(&self) -> &VfatMetadata {
+        &self.metadata
+    }
+}
+impl VfatMetadataTrait for VfatEntry {
+    fn metadata(&self) -> &VfatMetadata {
+        &self.metadata
+    }
 }
 
 #[derive(Debug)]
@@ -42,6 +68,15 @@ impl VfatEntry {
     pub fn into_directory(self) -> Option<VfatDirectory> {
         self.is_dir()
             .then(|| VfatDirectory::new(self.vfat_filesystem, self.metadata))
+    }
+    pub fn into_directory_unchecked(self) -> VfatDirectory {
+        VfatDirectory::new(self.vfat_filesystem, self.metadata)
+    }
+    pub fn into_directory_or_not_found(self) -> Result<VfatDirectory> {
+        // todo: suboptimal, only used if there is an error
+        let name = self.metadata.name().into();
+        self.into_directory()
+            .ok_or(crate::error::VfatRsError::EntryNotFound { target: name })
     }
     fn is_file(&self) -> bool {
         !self.is_dir()

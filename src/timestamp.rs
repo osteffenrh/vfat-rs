@@ -27,13 +27,13 @@ defbit!(
 // 10-5 Minutes (0-59)
 // 4-0 Seconds/2 (0-29)
 impl VfatTimestamp {
-    fn year(&self) -> u32 {
+    pub fn year(&self) -> u32 {
         self.get_value(Self::YEAR) + 1980_u32
     }
-    fn month(&self) -> u32 {
+    pub fn month(&self) -> u32 {
         self.get_value(Self::MONTH)
     }
-    fn day(&self) -> u32 {
+    pub fn day(&self) -> u32 {
         self.get_value(Self::DAY)
     }
     fn hour(&self) -> u32 {

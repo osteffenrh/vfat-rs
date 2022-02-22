@@ -1,4 +1,5 @@
-use binrw::io::{Read, Seek, SeekFrom, Write};
+use binrw::io::{SeekFrom, Write};
+use chrono::{DateTime, Datelike, Local};
 use std::fs::OpenOptions;
 use std::sync::Arc;
 
@@ -173,14 +174,29 @@ fn test_path() {
 
 #[test]
 #[serial]
-fn test_list_directory() -> vfat_rs::Result<()> {
-    let mut vfat = init_vfat()?;
+fn test_get_path() -> vfat_rs::Result<()> {
+    use vfat_rs::VfatMetadataTrait;
 
-    assert!(vfat.get_path("/hello.txt".into()).is_ok());
+    let mut vfat = init_vfat()?;
+    vfat.get_path("/not-found.txt".into()).unwrap_err();
+    let file = vfat.get_path("/hello.txt".into()).unwrap();
+    let local: DateTime<Local> = Local::now();
+    assert_eq!(file.creation().year(), local.year() as u32);
+    assert_eq!(file.creation().month(), local.month());
+    assert_eq!(file.creation().day(), local.day());
+
     info!("Hello txt found!");
     assert!(vfat
         .get_path("/folder/some/deep/nested/folder/file".into())
         .is_ok());
+    Ok(())
+}
+#[test]
+#[serial]
+#[ignore]
+fn test_list_directory() -> vfat_rs::Result<()> {
+    //TODO: test directory listing
+    //unimplemented!()
     Ok(())
 }
 
@@ -334,8 +350,7 @@ fn test_create_directory(prefix: &str) -> vfat_rs::Result<()> {
 
     // Cleanup:
     vfat.get_path(Path::new(dir_path))?
-        .into_directory()
-        .unwrap()
+        .into_directory_unchecked()
         .delete(sub_dir.to_string())?;
     vfat.get_root()?.delete(dir_name.to_string())?;
     Ok(())

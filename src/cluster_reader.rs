@@ -1,7 +1,7 @@
 use log::{debug, info};
 
 use crate::cache::CachedPartition;
-use crate::{error, fat_reader, ArcMutex, BlockDevice, ClusterId, MutexTrait, SectorId};
+use crate::{error, fat_reader, ArcMutex, BlockDevice, ClusterId, MutexTrait, Result, SectorId};
 
 pub fn cluster_to_sector(
     cluster: ClusterId,
@@ -64,10 +64,7 @@ impl ClusterReader {
             final_sector: start_sector + SectorId(sectors_per_cluster),
         }
     }
-}
-
-impl binrw::io::Read for ClusterReader {
-    fn read(&mut self, buf: &mut [u8]) -> core::result::Result<usize, binrw::io::Error> {
+    pub(crate) fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         if self.current_sector >= self.final_sector || buf.is_empty() {
             return Ok(0);
         }
@@ -215,11 +212,7 @@ impl ClusterChainReader {
             self.sector_size,
         )
     }
-}
-
-impl binrw::io::Read for ClusterChainReader {
-    /// Read sectors one by one, until the requested buf size is fullfilled.
-    fn read(&mut self, buf: &mut [u8]) -> core::result::Result<usize, binrw::io::Error> {
+    pub(crate) fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         if self.current_cluster.is_none() || buf.is_empty() {
             return Ok(0);
         }

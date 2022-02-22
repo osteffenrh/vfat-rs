@@ -60,7 +60,7 @@ impl VfatMetadata {
     pub(crate) fn last_update(&self) -> Option<VfatTimestamp> {
         Some(self.last_update)
     }
-
+    // TODO: why are these optional?
     pub(crate) fn creation(&self) -> Option<VfatTimestamp> {
         Some(self.creation)
     }

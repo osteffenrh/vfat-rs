@@ -1,6 +1,6 @@
 use core::mem;
 
-use crate::error::Error::CheckedMulFailed;
+use crate::error::VfatRsError::CheckedMulFailed;
 use crate::{error, SectorId};
 use crate::{ClusterId, RawFatEntry};
 
