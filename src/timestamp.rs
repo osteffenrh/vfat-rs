@@ -2,9 +2,9 @@ use crate::defbit;
 
 /// Tenths of a second. Range 0-199 inclusive,
 /// as represented in FAT32 on-disk structures.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Default, Copy, Clone)]
-pub struct Milliseconds(pub u8);
+pub struct Milliseconds(u8);
 impl Milliseconds {
     pub fn new_unchecked(time: u8) -> Self {
         Self(time)

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::cmp::min;
 use core::convert::TryInto;
 use core::fmt::{Debug, Formatter};
-use core::{fmt, iter, mem};
+use core::{fmt, iter};
 
 use log::{debug, info};
 use regex::Regex;
@@ -13,7 +13,7 @@ use crate::os_interface::directory_entry::long_file_name_entry::{
     LongFileNameEntry, SequenceNumber,
 };
 pub use crate::os_interface::directory_entry::regular_entry::RegularDirectoryEntry;
-pub use crate::os_interface::directory_entry::unknown_entry::UnknownDirectoryEntry;
+pub use crate::os_interface::directory_entry::unknown_entry::*;
 use crate::timestamp::VfatTimestamp;
 use crate::{const_assert_size, ClusterId};
 
@@ -60,7 +60,7 @@ mod attribute {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
+#[repr(transparent)]
 pub struct Attributes(pub u8);
 impl Attributes {
     pub fn new_directory() -> Self {
@@ -137,15 +137,11 @@ impl From<UnknownDirectoryEntry> for VfatDirectoryEntry {
             EntryId::Deleted => VfatDirectoryEntry::Deleted(unknown),
             EntryId::EndOfEntries => VfatDirectoryEntry::EndOfEntries(unknown),
             EntryId::Valid(_) if unknown.is_lfn() => {
-                let long_file_name_entry = unsafe { mem::transmute(unknown) };
                 //info!("Long file name entry: {:?}", long_file_name_entry);
-                VfatDirectoryEntry::LongFileName(long_file_name_entry)
+                VfatDirectoryEntry::LongFileName(unknown.into())
             }
             // if this is not an lfn, catchall to a Valid entry:
-            EntryId::Valid(_) => {
-                let regular_directory_entry = unsafe { mem::transmute(unknown) };
-                VfatDirectoryEntry::Regular(regular_directory_entry)
-            }
+            EntryId::Valid(_) => VfatDirectoryEntry::Regular(unknown.into()),
         }
     }
 }
@@ -167,8 +163,7 @@ impl VfatDirectoryEntry {
         parent_dir: ClusterId,
     ) -> [UnknownDirectoryEntry; 2] {
         let (current_high, current_low) = current_dir.into_high_low();
-        let mut current_name = [PADDING_CHARACTER; 8];
-        current_name[0] = DOT_CHARACTER;
+        let current_name = [DOT_CHARACTER, 0, 0, 0, 0, 0, 0, 0];
         let file_ext = [PADDING_CHARACTER; 3];
         let attributes = Attributes::new_directory();
 
@@ -185,9 +180,8 @@ impl VfatDirectoryEntry {
             low_16bits: current_low,
             file_size: 0,
         };
-        let mut parent_name = [PADDING_CHARACTER; 8];
-        parent_name[0] = DOT_CHARACTER;
-        parent_name[1] = DOT_CHARACTER;
+
+        let parent_name = [DOT_CHARACTER, DOT_CHARACTER, 0, 0, 0, 0, 0, 0];
 
         // According to experiments against Linux fat32 driver, when I create a directory under root
         // it uses ClusterId(0) instead of ClusterId(2).
@@ -230,18 +224,9 @@ impl VfatDirectoryEntry {
 
     pub fn transmute_into_unknown_dir_entry(self) -> UnknownDirectoryEntry {
         match self {
-            Self::Regular(entry) => unsafe { mem::transmute(entry) },
-            Self::LongFileName(entry) => unsafe { mem::transmute(entry) },
-            Self::EndOfEntries(entry) => entry,
-            Self::Deleted(entry) => entry,
-        }
-    }
-
-    pub fn get_unkwown_dir_entry(self) -> Option<UnknownDirectoryEntry> {
-        if let Self::EndOfEntries(unkown) = self {
-            Some(unkown)
-        } else {
-            None
+            Self::Regular(entry) => entry.into(),
+            Self::LongFileName(entry) => entry.into(),
+            Self::EndOfEntries(entry) | Self::Deleted(entry) => entry,
         }
     }
 
@@ -263,6 +248,7 @@ impl VfatDirectoryEntry {
     /// ~2, etc., up to ~999999.
     // TODO: add some check for presence of another file called in the same way (I'm using always ~1).
     pub fn regular_filename_from(name: &str) -> [u8; 8] {
+        // FIXME: return a result, and reject these filenames?
         let replace_invalid_dos_char = |ch| {
             const INVALID_CHARS: [char; 6] = ['+', ',', ';', '=', '[', ']'];
             if INVALID_CHARS.contains(&ch) {

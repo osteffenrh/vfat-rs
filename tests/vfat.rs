@@ -236,7 +236,7 @@ fn test_find_next_free() {
         sectors_per_cluster: 1,
         sectors_per_fat: 1,
         root_cluster: ClusterId::new(0),
-        eoc_marker: RawFatEntry(0x00),
+        eoc_marker: Default::default(),
         sector_size: 1,
     };
     assert_eq!(
@@ -255,6 +255,27 @@ fn test_write_side_short() -> vfat_rs::Result<()> {
 #[serial]
 fn test_file_write_long() -> vfat_rs::Result<()> {
     test_file_write("a-very-long-file-name")
+}
+
+#[test]
+#[serial]
+fn test_file_creation() -> vfat_rs::Result<()> {
+    let invalid_name = "hello+world";
+    let used_name_path = "/hello_world";
+
+    let mut vfat = init_vfat()?;
+    let mut root = vfat.get_root()?;
+
+    // 2. assert file does not exists
+    vfat.path_exists(used_name_path.into())
+        .expect("File already exists. Please delete it.");
+
+    // 3. create file
+    root.create(invalid_name.into(), EntryType::File)
+        .expect("Cannote create file");
+
+    vfat.path_exists(used_name_path.into()).unwrap();
+    Ok(())
 }
 
 fn test_file_write(name: &str) -> vfat_rs::Result<()> {

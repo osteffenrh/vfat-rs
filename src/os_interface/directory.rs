@@ -9,11 +9,28 @@ use snafu::ensure;
 use crate::cluster_reader::ClusterChainReader;
 use crate::cluster_writer::ClusterChainWriter;
 use crate::os_interface::directory_entry::{
-    Attributes, EntryId, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
+    unknown_entry_convert_to_bytes_2, Attributes, EntryId, RegularDirectoryEntry,
+    UnknownDirectoryEntry, VfatDirectoryEntry,
 };
 use crate::os_interface::{VfatEntry, VfatMetadata};
 use crate::{cluster_writer, ClusterId, VfatFS};
 use crate::{error, timestamp::VfatTimestamp, SectorId};
+
+// TODO: this assumes sector size...
+const SECTOR_SIZE: usize = 512;
+const ENTRIES_AMOUNT: usize = SECTOR_SIZE / mem::size_of::<UnknownDirectoryEntry>();
+const BUF_SIZE: usize = mem::size_of::<UnknownDirectoryEntry>() * ENTRIES_AMOUNT;
+
+pub fn unknown_entry_convert_to_bytes_entries(
+    entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT],
+) -> [u8; BUF_SIZE] {
+    unsafe { mem::transmute(entries) }
+}
+pub fn unknown_entry_convert_from_bytes_entries(
+    entries: [u8; BUF_SIZE],
+) -> [UnknownDirectoryEntry; ENTRIES_AMOUNT] {
+    unsafe { mem::transmute(entries) }
+}
 
 pub enum EntryType {
     File,
@@ -167,8 +184,7 @@ impl VfatDirectory {
             found_spot_start_index, offset_in_sector, sector_offset, cluster_id
         );
         for unknown_entry in entries.into_iter() {
-            let entry: [u8; mem::size_of::<UnknownDirectoryEntry>()] =
-                unsafe { mem::transmute(unknown_entry) };
+            let entry: [u8; mem::size_of::<UnknownDirectoryEntry>()] = unknown_entry.into();
             ccw.write(&entry)?;
         }
 
@@ -178,8 +194,7 @@ impl VfatDirectory {
             let mut cw = self
                 .vfat_filesystem
                 .cluster_writer(metadata.cluster, SectorId(0), 0);
-            let buf: [u8; mem::size_of::<UnknownDirectoryEntry>() * 2] =
-                unsafe { mem::transmute(entries) };
+            let buf = unknown_entry_convert_to_bytes_2(entries);
             cw.write(&buf)?;
         }
 
@@ -191,6 +206,25 @@ impl VfatDirectory {
         })
     }
 
+    /// Returns an entry from inside this directory.
+    fn get_entry(&mut self, target_filename: String) -> error::Result<VfatEntry> {
+        Ok(self
+            .contents()?
+            .into_iter()
+            .find(|name| {
+                debug!(
+                    "Checking name: {} == {}",
+                    name.metadata.name(),
+                    target_filename
+                );
+                name.metadata.name() == target_filename
+            })
+            .ok_or(error::VfatRsError::FileNotFound {
+                target: target_filename,
+            })?)
+    }
+
+    //TOOD: test pseudo dir deletion.
     pub fn delete(&mut self, target_name: String) -> error::Result<()> {
         info!("Starting delete routine for entry: '{}'. ", target_name);
         info!("Directory contents: {:?}", self.contents()?);
@@ -206,35 +240,15 @@ impl VfatDirectory {
             }
         );
 
-        let mut target_entry = self
-            .contents()?
-            .into_iter()
-            .find(|name| {
-                debug!("Checking name: {} == {}", name.metadata.name(), target_name);
-                name.metadata.name() == target_name
-            })
-            .ok_or(error::VfatRsError::FileNotFound {
-                target: target_name,
-            })?;
+        let target_entry = self.get_entry(target_name)?;
 
         info!("Found target entry: {:?}", target_entry);
-        if target_entry.is_dir() {
-            let directory = target_entry.into_directory_unchecked();
-            if directory.contents()?.len() > 2 {
-                return Err(error::VfatRsError::NonEmptyDirectory {
-                    target: directory.metadata.name().to_string(),
-                });
-            }
-            info!("Target entry is a directory with no contents. It's safe to delete.");
-            target_entry = directory.into();
-        }
         self.delete_entry(target_entry)
     }
 
     fn contents(&self) -> error::Result<Vec<VfatEntry>> {
         info!("Directory contents, cluster: {:?}", self.metadata.cluster);
 
-        const BUF_SIZE: usize = 512;
         let mut buf = [0; BUF_SIZE];
         let mut contents = Vec::new();
         let filter_invalid =
@@ -249,9 +263,8 @@ impl VfatDirectory {
             if 0 == cluster_chain_reader.read(&mut buf)? {
                 break;
             }
-            let unknown_entries: [UnknownDirectoryEntry;
-                BUF_SIZE / mem::size_of::<UnknownDirectoryEntry>()] =
-                unsafe { mem::transmute(buf) };
+            let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
+                unknown_entry_convert_from_bytes_entries(buf);
             debug!("Unknown entries: {:?}", unknown_entries);
             unknown_entries
                 .iter()
@@ -354,7 +367,6 @@ impl VfatDirectory {
     ) -> error::Result<()> {
         info!("Running update entry routine...");
         // TODO: assumes cluster size:
-        const BUF_SIZE: usize = 512;
         let mut buf = [0; BUF_SIZE];
 
         let mut lfn_buff: Vec<(u8, String)> = Vec::new();
@@ -365,9 +377,8 @@ impl VfatDirectory {
                 info!("Cluster chain reader is over.");
                 break;
             }
-            let unknown_entries: [UnknownDirectoryEntry;
-                BUF_SIZE / mem::size_of::<UnknownDirectoryEntry>()] =
-                unsafe { mem::transmute(buf) };
+            let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
+                unknown_entry_convert_from_bytes_entries(buf);
 
             for (index, dir_entry) in unknown_entries
                 .iter()
@@ -414,6 +425,20 @@ impl VfatDirectory {
         })
     }
     fn delete_entry(&mut self, entry: VfatEntry) -> error::Result<()> {
+        const SPECIAL_CURRENT_UPPER_DIRECTORY: usize = 2;
+        let entry = if entry.is_dir() {
+            let directory = entry.into_directory_unchecked();
+            if directory.contents()?.len() > SPECIAL_CURRENT_UPPER_DIRECTORY {
+                return Err(error::VfatRsError::NonEmptyDirectory {
+                    target: directory.metadata.name().to_string(),
+                });
+            }
+            info!("Target entry is a directory with no contents. It's safe to delete.");
+            directory.into()
+        } else {
+            entry
+        };
+
         info!(
             "Deleting entry's associated clusters starting at {:?}",
             entry.metadata.cluster
@@ -443,7 +468,7 @@ impl VfatDirectory {
             .checked_mul(mem::size_of::<UnknownDirectoryEntry>())
             .unwrap();
 
-        let buf: [u8; mem::size_of::<UnknownDirectoryEntry>()] = unsafe { mem::transmute(entry) };
+        let buf: [u8; mem::size_of::<UnknownDirectoryEntry>()] = entry.into();
 
         debug!("Update entry by index, going to update entry index: {}, in sectorId: {}, in cluster: {}, with offset_in_sector: {}",
         index, containing_sector, self.metadata.cluster, offset_in_sector);
@@ -464,10 +489,6 @@ impl VfatDirectory {
         spots_needed: usize,
     ) -> error::Result<Option<(usize, ClusterId)>> {
         assert!(spots_needed > 0);
-        // TODO: this assumes sector size...
-        const SECTOR_SIZE: usize = 512;
-        const ENTRIES_AMOUNT: usize = SECTOR_SIZE / mem::size_of::<UnknownDirectoryEntry>();
-        const BUF_SIZE: usize = mem::size_of::<UnknownDirectoryEntry>() * ENTRIES_AMOUNT;
         info!(
             "Going to look for a spot, starting from: {}",
             self.metadata.cluster
@@ -483,7 +504,7 @@ impl VfatDirectory {
 
         while cluster_chain_reader.read(&mut buff)? > 0 {
             let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
-                unsafe { mem::transmute(buff) };
+                unknown_entry_convert_from_bytes_entries(buff);
             for (index, entry) in unknown_entries.iter().enumerate() {
                 if entry.last_entry() {
                     if start_cluster.is_none() {

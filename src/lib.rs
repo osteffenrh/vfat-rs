@@ -3,7 +3,6 @@
 #![deny(unaligned_references)]
 //#![deny(missing_docs)]
 //#![deny(unsafe_code)]
-
 // to remove:
 #![allow(unused_variables)]
 #![allow(dead_code)]
@@ -148,13 +147,13 @@ impl VfatFS {
         const BUF_SIZE: usize = FAT_ENTRY_SIZE * ENTRIES_BUF_SIZE;
         let mut buf = [0; BUF_SIZE];
         device.read_sector(fat_start_sector, &mut buf).unwrap();
-        let raw_entry: RawFatEntry = unsafe { mem::transmute(buf) };
+        let raw_entry: RawFatEntry = RawFatEntry::new(buf);
         info!("End of chain marker: {:?}", raw_entry);
         Ok(raw_entry)
     }
 
     fn get_last_cluster_entry(&self) -> FatEntry {
-        FatEntry::LastCluster(self.eoc_marker.0)
+        FatEntry::LastCluster(self.eoc_marker.get())
     }
 
     /// Converts a cluster (a FAT concept) to a sector (a BlockDevice concept).
@@ -171,6 +170,7 @@ impl VfatFS {
     pub fn find_free_cluster(&self) -> error::Result<Option<ClusterId>> {
         info!("Starting find free cluster routine");
         const FAT_ENTRY_SIZE: usize = core::mem::size_of::<RawFatEntry>();
+        // TODO: assumes sectors size.
         const ENTRIES_BUF_SIZE: usize = 512 / FAT_ENTRY_SIZE;
         const BUF_SIZE: usize = FAT_ENTRY_SIZE * ENTRIES_BUF_SIZE;
         let sectors_per_fat = self.sectors_per_fat;
@@ -184,7 +184,13 @@ impl VfatFS {
                     .read_sector(SectorId(fat_start_sector as u32 + i), &mut buf)
                     .unwrap();
             });
-            let raw_entries: [RawFatEntry; ENTRIES_BUF_SIZE] = unsafe { mem::transmute(buf) };
+            let mut raw_entries: [RawFatEntry; ENTRIES_BUF_SIZE] =
+                [Default::default(); ENTRIES_BUF_SIZE];
+
+            for (i, bytes) in buf.chunks(4).enumerate() {
+                raw_entries[i] = RawFatEntry::new_ref(bytes);
+            }
+
             for (id, raw) in raw_entries.iter().enumerate() {
                 let cid = (ENTRIES_BUF_SIZE as u32 * i) as u32 + id as u32;
                 debug!("(cid: {:?}) Fat entry: {:?}", FatEntry::from(*raw), cid);
@@ -373,8 +379,8 @@ impl VfatFS {
         const BUF_SIZE: usize = UNKNOWN_ENTRIES * mem::size_of::<UnknownDirectoryEntry>();
         let mut buf = [0; BUF_SIZE];
         let mut cluster_reader = self.cluster_reader(self.root_cluster);
-        let _amount_read = cluster_reader.read(&mut buf);
-        let unknown_entries: UnknownDirectoryEntry = unsafe { mem::transmute(buf) };
+        let _ = cluster_reader.read(&mut buf)?;
+        let unknown_entries: UnknownDirectoryEntry = buf.into();
         debug!("Unknown entries: {:?}", unknown_entries);
         let volume_id = VfatDirectoryEntry::from(unknown_entries)
             .into_regular()

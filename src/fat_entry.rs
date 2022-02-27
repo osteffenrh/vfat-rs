@@ -1,21 +1,31 @@
 use crate::ClusterId;
 use core::{fmt, mem};
 
-#[derive(Copy, Clone)]
-pub struct RawFatEntry(pub u32);
+#[derive(Copy, Clone, Default)]
+#[repr(transparent)]
+pub struct RawFatEntry(u32);
 
 impl RawFatEntry {
     pub fn as_buff(self) -> [u8; mem::size_of::<Self>()] {
-        self.0.to_ne_bytes()
+        self.0.to_le_bytes()
+    }
+    pub fn get(&self) -> u32 {
+        self.0
+    }
+    pub fn new_ref(buff: &[u8]) -> Self {
+        let mut temp = [0u8; 4];
+        temp.copy_from_slice(buff);
+        Self::new(temp)
+    }
+    pub fn new(buff: [u8; mem::size_of::<u32>()]) -> Self {
+        RawFatEntry(u32::from_le_bytes(buff))
     }
 }
-
 impl From<u32> for RawFatEntry {
     fn from(val: u32) -> Self {
-        RawFatEntry(val)
+        Self(val)
     }
 }
-
 impl fmt::Debug for RawFatEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "RawFatEntry(0x{:X})", self.0)

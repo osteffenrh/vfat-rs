@@ -1,4 +1,5 @@
 use crate::const_assert_size;
+use crate::os_interface::directory_entry::long_file_name_entry::LongFileNameEntry;
 use crate::os_interface::directory_entry::{
     Attributes, EntryId, RegularDirectoryEntry, VfatDirectoryEntry,
 };
@@ -30,9 +31,45 @@ impl UnknownDirectoryEntry {
         self.id = entry_id.into();
     }
 }
+impl From<LongFileNameEntry> for UnknownDirectoryEntry {
+    fn from(lfn: LongFileNameEntry) -> Self {
+        unsafe { mem::transmute(lfn) }
+    }
+}
 
 impl From<RegularDirectoryEntry> for UnknownDirectoryEntry {
     fn from(regular: RegularDirectoryEntry) -> Self {
         unsafe { mem::transmute(regular) }
+    }
+}
+
+impl From<UnknownDirectoryEntry> for LongFileNameEntry {
+    fn from(ue: UnknownDirectoryEntry) -> Self {
+        unsafe { mem::transmute(ue) }
+    }
+}
+
+impl From<UnknownDirectoryEntry> for RegularDirectoryEntry {
+    fn from(ue: UnknownDirectoryEntry) -> Self {
+        unsafe { mem::transmute(ue) }
+    }
+}
+
+impl From<UnknownDirectoryEntry> for [u8; mem::size_of::<UnknownDirectoryEntry>()] {
+    fn from(ude: UnknownDirectoryEntry) -> Self {
+        unsafe { mem::transmute(ude) }
+    }
+}
+
+// todo: find a way to parametrize const T: usize
+
+pub fn unknown_entry_convert_to_bytes_2(
+    entries: [UnknownDirectoryEntry; 2],
+) -> [u8; mem::size_of::<UnknownDirectoryEntry>() * 2] {
+    unsafe { mem::transmute(entries) }
+}
+impl From<[u8; mem::size_of::<UnknownDirectoryEntry>()]> for UnknownDirectoryEntry {
+    fn from(buf: [u8; mem::size_of::<UnknownDirectoryEntry>()]) -> Self {
+        unsafe { mem::transmute(buf) }
     }
 }

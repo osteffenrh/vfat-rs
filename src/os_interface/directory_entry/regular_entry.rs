@@ -65,15 +65,15 @@ impl From<VfatMetadata> for RegularDirectoryEntry {
         RegularDirectoryEntry {
             file_name,
             file_ext,
-            attributes: metadata.attributes,
-            _reseverd_win_nt: 0,
-            creation_millis: Milliseconds(0),
-            creation_time: metadata.creation().unwrap(),
-            last_access_date: 0,
             high_16bits,
-            last_modification_time: metadata.last_update().unwrap(),
             low_16bits,
+            attributes: metadata.attributes,
+            creation_time: metadata.creation().unwrap(),
+            last_modification_time: metadata.last_update().unwrap(),
             file_size: metadata.size,
+            _reseverd_win_nt: 0,
+            creation_millis: Default::default(),
+            last_access_date: 0,
         }
     }
 }

@@ -27,7 +27,7 @@ pub fn read_fat_entry(
     mutex
         .lock(|dev| dev.read_sector_offset(sector, offset, &mut buf))
         .map(|_| {
-            let raw_entry: RawFatEntry = unsafe { mem::transmute(buf) };
+            let raw_entry = RawFatEntry::new(buf);
             FatEntry::from(raw_entry)
         })
 }
