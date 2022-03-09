@@ -5,11 +5,7 @@ use crate::defbit;
 #[repr(transparent)]
 #[derive(Default, Copy, Clone)]
 pub struct Milliseconds(u8);
-impl Milliseconds {
-    pub fn new_unchecked(time: u8) -> Self {
-        Self(time)
-    }
-}
+
 defbit!(
     VfatTimestamp,
     u32,
@@ -36,15 +32,15 @@ impl VfatTimestamp {
     pub fn day(&self) -> u32 {
         self.get_value(Self::DAY)
     }
-    fn hour(&self) -> u32 {
+    pub fn hour(&self) -> u32 {
         self.get_value(Self::HOURS)
     }
-    fn minute(&self) -> u32 {
+    pub fn minute(&self) -> u32 {
         self.get_value(Self::MINUTES)
     }
     /// Seconds are stored as number of 2-second intervals.
     /// Range: 0..29 29 represents 58 seconds
-    fn second(&self) -> u32 {
+    pub fn second(&self) -> u32 {
         self.get_value(Self::SECONDS) * 2
     }
 }

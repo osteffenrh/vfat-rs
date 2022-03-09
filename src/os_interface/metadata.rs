@@ -52,10 +52,12 @@ impl VfatMetadata {
         self.size as usize
     }
 
+    /*
     fn last_access(&self) -> Option<VfatTimestamp> {
         //Some(self.last_access)
         None
     }
+    */
 
     pub(crate) fn last_update(&self) -> Option<VfatTimestamp> {
         Some(self.last_update)

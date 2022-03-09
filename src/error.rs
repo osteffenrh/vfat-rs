@@ -65,7 +65,7 @@ pub enum MbrError {
 
 // Used for Impl Write/Read
 impl From<VfatRsError> for binrw::io::Error {
-    fn from(err: VfatRsError) -> Self {
+    fn from(_err: VfatRsError) -> Self {
         // TODO: provide useful output
         binrw::io::ErrorKind::Other.into()
     }

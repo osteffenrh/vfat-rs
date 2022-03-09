@@ -72,15 +72,13 @@ impl ClusterWriter {
                 self.current_sector, self.offset_byte_in_current_sector
             );
             let mut mutex = self.device.as_ref();
-            let amount_written = mutex
-                .lock(|device| {
-                    device.write_sector_offset(
-                        self.current_sector,
-                        self.offset_byte_in_current_sector,
-                        &buf[total_written..],
-                    )
-                })
-                .map_err(|err| binrw::io::ErrorKind::Other)?; // TODO: fix error type
+            let amount_written = mutex.lock(|device| {
+                device.write_sector_offset(
+                    self.current_sector,
+                    self.offset_byte_in_current_sector,
+                    &buf[total_written..],
+                )
+            })?;
             info!("CW: amount written: {}", amount_written);
 
             total_written += amount_written;
@@ -98,11 +96,9 @@ impl ClusterWriter {
         Ok(total_written)
     }
 
-    fn flush(&mut self) -> core::result::Result<(), binrw::io::Error> {
+    fn _flush(&mut self) -> core::result::Result<(), binrw::io::Error> {
         let mut mutex = self.device.as_ref();
-        Ok(mutex
-            .lock(|dev| dev.flush())
-            .map_err(|err| binrw::io::ErrorKind::Other)?) // TODO: fix error type.
+        Ok(mutex.lock(|dev| dev.flush())?)
     }
 }
 
@@ -236,15 +232,10 @@ impl ClusterChainWriter {
 
         let mut amount_written = 0;
         while amount_written < buf.len() && self.current_cluster.is_some() {
-            let current_amount_written = self
-                .cluster_writer
-                .write(&buf[amount_written..])
-                .map_err(|err| binrw::io::ErrorKind::Other)?; // TODO: fix error type.
+            let current_amount_written = self.cluster_writer.write(&buf[amount_written..])?;
             amount_written += current_amount_written;
             if current_amount_written == 0 {
-                self.current_cluster = self
-                    .next_cluster()
-                    .map_err(|err| binrw::io::ErrorKind::Other)?; // TODO: fix error type.
+                self.current_cluster = self.next_cluster()?;
                 if self.current_cluster.is_some() {
                     // If there is another cluster in the chain,
                     // create a new cluster writer.
@@ -256,10 +247,8 @@ impl ClusterChainWriter {
         Ok(amount_written)
     }
 
-    fn flush(&mut self) -> Result<()> {
+    fn _flush(&mut self) -> Result<()> {
         let mut mutex = self.vfat_filesystem.device.as_ref();
-        Ok(mutex
-            .lock(|device| device.flush())
-            .map_err(|err| binrw::io::ErrorKind::Other)?) // TODO: fix error type.
+        mutex.lock(|device| device.flush())
     }
 }

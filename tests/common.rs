@@ -15,6 +15,7 @@ pub fn setup() -> PathBuf {
     fs_path.into()
 }
 
+#[allow(dead_code)]
 pub fn purge_fs() -> io::Result<()> {
     fs::remove_file("/tmp/irisos_fat32/fat32.fs").unwrap();
     fs::remove_dir("/tmp/irisos_fat32/").unwrap();

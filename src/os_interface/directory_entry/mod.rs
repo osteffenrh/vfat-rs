@@ -230,7 +230,8 @@ impl VfatDirectoryEntry {
         }
     }
 
-    pub fn get_long_file_name(self) -> Option<LongFileNameEntry> {
+    #[cfg(test)]
+    pub fn into_long_file_name(self) -> Option<LongFileNameEntry> {
         if let Self::LongFileName(long_file_name) = self {
             Some(long_file_name)
         } else {
@@ -488,7 +489,7 @@ mod test {
         assert!(given.len() > 0);
 
         let lfn: LongFileNameEntry = VfatDirectoryEntry::from(given.get(0).unwrap())
-            .get_long_file_name()
+            .into_long_file_name()
             .unwrap();
         let first_set: [u16; 5] = VfatDirectoryEntry::convert(b"4char");
         let second_set: [u16; 6] = VfatDirectoryEntry::convert(b"s.ext");
@@ -524,7 +525,7 @@ mod test {
         // -----
 
         let lfn = VfatDirectoryEntry::from(given.remove(0))
-            .get_long_file_name()
+            .into_long_file_name()
             .unwrap();
         assert_eq!(VfatDirectoryEntry::convert(b"e-ent-"), {
             lfn.name_characters
@@ -536,7 +537,7 @@ mod test {
         // ---
 
         let lfn = VfatDirectoryEntry::from(given.remove(0))
-            .get_long_file_name()
+            .into_long_file_name()
             .unwrap();
         assert_eq!(VfatDirectoryEntry::convert(b"long-"), {
             lfn.name_characters
@@ -547,7 +548,7 @@ mod test {
         assert_eq!(VfatDirectoryEntry::convert(b"am"), { lfn.third_set_name });
 
         let lfn = VfatDirectoryEntry::from(given.remove(0))
-            .get_long_file_name()
+            .into_long_file_name()
             .unwrap();
         assert_eq!(VfatDirectoryEntry::convert(b"a-sup"), {
             lfn.name_characters

@@ -73,6 +73,7 @@ impl From<RawFatEntry> for FatEntry {
         }
     }
 }
+
 impl From<FatEntry> for RawFatEntry {
     fn from(fat_entry: FatEntry) -> Self {
         use FatEntry::*;

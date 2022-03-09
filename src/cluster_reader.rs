@@ -226,9 +226,7 @@ impl ClusterChainReader {
             debug!("CCR: current_amount_read: {}", current_amount_read);
             amount_read += current_amount_read;
             if current_amount_read == 0 {
-                self.current_cluster = self
-                    .next_cluster()
-                    .map_err(|err| binrw::io::ErrorKind::Other)?; // TODO: fix error type.
+                self.current_cluster = self.next_cluster()?;
                 if self.current_cluster.is_some() {
                     info!("Using next cluster: {:?}", self.current_cluster);
                     // If there is another cluster in the chain,

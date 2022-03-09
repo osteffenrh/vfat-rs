@@ -1,4 +1,6 @@
 ### VFAT / FAT32
+* Exfat specification: https://docs.microsoft.com/en-us/windows/win32/fileio/exfat-specification#1-introduction
+
 
 ## Limitations
 From: https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#Size_limits

@@ -68,9 +68,8 @@ impl VfatFile {
         let mut ccw = self
             .vfat_filesystem
             .cluster_chain_writer(self.metadata.cluster);
-        // TODO: FIXME.
-        ccw.seek(self.offset)
-            .map_err(|err| binrw::io::ErrorKind::Other)?;
+
+        ccw.seek(self.offset)?;
 
         info!(
             "File: Write: Clusterid: {} amount to write: {}",
@@ -151,7 +150,7 @@ impl VfatFile {
         Ok(amount_read)
     }
 
-    fn sync(&mut self) -> error::Result<()> {
+    fn _sync(&mut self) -> error::Result<()> {
         unimplemented!()
     }
 }

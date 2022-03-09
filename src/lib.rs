@@ -4,8 +4,8 @@
 //#![deny(missing_docs)]
 //#![deny(unsafe_code)]
 // to remove:
-#![allow(unused_variables)]
-#![allow(dead_code)]
+//#![allow(unused_variables)]
+//#![allow(dead_code)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::blocks_in_if_conditions)]
 
@@ -97,7 +97,7 @@ impl VfatFS {
     ) -> error::Result<FullExtendedBIOSParameterBlock> {
         let mut buff = [0u8; 512];
         device.read_sector(start_sector.into(), &mut buff)?;
-        Ok(Cursor::new(&buff).read_ne()?)
+        Ok(Cursor::new(&buff).read_le()?)
     }
 
     /// start_sector: Partition's start sector, or "Entry Offset Sector".
@@ -119,6 +119,8 @@ impl VfatFS {
         let sector_size = device.sector_size();
         let cached_partition = CachedPartition::new(device);
         let sectors_per_fat = full_ebpb.extended.sectors_per_fat;
+        // TODO: use a proper error type.
+        assert!(full_ebpb.extended.signature == 0x28 || full_ebpb.extended.signature == 0x29);
         Ok(VfatFS {
             sector_size,
             device: Arc::new(NullLock::new(cached_partition)),
@@ -400,9 +402,5 @@ impl VfatFS {
             Attributes::new_directory(),
         );
         Ok(VfatDirectory::new(self.clone(), metadata))
-    }
-
-    fn get_canonical_name() -> &'static str {
-        "VFAT/FAT32"
     }
 }

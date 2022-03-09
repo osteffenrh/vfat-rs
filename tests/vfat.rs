@@ -184,7 +184,9 @@ fn test_get_path() -> vfat_rs::Result<()> {
     assert_eq!(file.creation().year(), local.year() as u32);
     assert_eq!(file.creation().month(), local.month());
     assert_eq!(file.creation().day(), local.day());
-
+    assert!(file.creation().hour() <= 23);
+    assert!(file.creation().minute() <= 60);
+    assert!(file.creation().second() <= 60);
     info!("Hello txt found!");
     assert!(vfat
         .get_path("/folder/some/deep/nested/folder/file".into())

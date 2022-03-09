@@ -21,11 +21,6 @@ const SECTOR_SIZE: usize = 512;
 const ENTRIES_AMOUNT: usize = SECTOR_SIZE / mem::size_of::<UnknownDirectoryEntry>();
 const BUF_SIZE: usize = mem::size_of::<UnknownDirectoryEntry>() * ENTRIES_AMOUNT;
 
-pub fn unknown_entry_convert_to_bytes_entries(
-    entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT],
-) -> [u8; BUF_SIZE] {
-    unsafe { mem::transmute(entries) }
-}
 pub fn unknown_entry_convert_from_bytes_entries(
     entries: [u8; BUF_SIZE],
 ) -> [UnknownDirectoryEntry; ENTRIES_AMOUNT] {
@@ -208,8 +203,7 @@ impl VfatDirectory {
 
     /// Returns an entry from inside this directory.
     fn get_entry(&mut self, target_filename: String) -> error::Result<VfatEntry> {
-        Ok(self
-            .contents()?
+        self.contents()?
             .into_iter()
             .find(|name| {
                 debug!(
@@ -221,7 +215,7 @@ impl VfatDirectory {
             })
             .ok_or(error::VfatRsError::FileNotFound {
                 target: target_filename,
-            })?)
+            })
     }
 
     //TOOD: test pseudo dir deletion.
