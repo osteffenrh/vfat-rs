@@ -1,4 +1,5 @@
 use binrw::io::Write;
+use log::debug;
 use std::cmp::min;
 use std::fs::File;
 use std::io::SeekFrom;
@@ -23,9 +24,8 @@ impl BlockDevice for FilebackedBlockDevice {
     ) -> vfat_rs::Result<usize> {
         let max_read = min(buf.len(), self.sector_size());
         let mut temp_buf = vec![0; max_read];
-        println!("Max read: {}", max_read);
         let final_destination = sector.0 as u64 * self.sector_size() as u64 + offset as u64;
-        println!(
+        debug!(
             "Sector: {}, offset: {}, finaldest: {}",
             sector.0 as u64 * self.sector_size() as u64,
             offset,
@@ -36,9 +36,9 @@ impl BlockDevice for FilebackedBlockDevice {
             .expect("Impossible to seek to the sector");
 
         self.image
-            .read(temp_buf.as_mut_slice())
+            .read_exact(temp_buf.as_mut_slice())
             .expect("Impossible to read from image");
-        println!("done reading...");
+        debug!("done reading read_sector_offset...");
         buf.write(temp_buf.as_mut_slice()).map_err(Into::into)
     }
 

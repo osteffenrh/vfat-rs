@@ -1,5 +1,6 @@
 use binrw::io::{SeekFrom, Write};
-use core::cmp;
+use core::fmt::Formatter;
+use core::{cmp, fmt};
 
 use log::{debug, info};
 
@@ -13,6 +14,15 @@ pub struct VfatFile {
     pub(crate) metadata: VfatMetadata,
     // Current Seek position
     pub offset: usize,
+}
+impl fmt::Debug for VfatFile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "VfatFile: metadata: {:?}, offset: {:?}.",
+            self.metadata, self.offset
+        )
+    }
 }
 
 impl VfatFile {
@@ -72,14 +82,15 @@ impl VfatFile {
         ccw.seek(self.offset)?;
 
         info!(
-            "File: Write: Clusterid: {} amount to write: {}",
+            "File: Write: Clusterid: {} amount to write: {}, offset: {}",
             self.metadata.cluster,
-            buf.len()
+            buf.len(),
+            self.offset,
         );
         let amount_written = ccw.write(buf)?;
         info!("File: Write: Amount written: {}", amount_written);
-
         self.update_file_size(amount_written)?;
+        self.offset += amount_written;
 
         Ok(amount_written)
     }

@@ -114,7 +114,6 @@ To eat the world's due, by the grave and thee.
     let mut buf = [0; LONG_FILE.len()];
     file.read(&mut buf)?;
     assert_eq!(LONG_FILE, &buf);
-    assert_eq!(LONG_FILE.len(), file.metadata().size());
 
     const FIRST_LINE: &[u8] = b"From fairest creatures we desire increase,";
     let mut buf = [0u8; FIRST_LINE.len()];
@@ -335,6 +334,60 @@ fn test_file_write(name: &str) -> vfat_rs::Result<()> {
     info!("Read: {:?}", String::from_utf8_lossy(&double_buf));
     assert_eq!(CONTENT, &double_buf[..CONTENT.len()], "first half");
     assert_eq!(CONTENT, &double_buf[CONTENT.len()..], "second half");
+
+    root.delete(file_name).expect("delete file");
+    // 6. assert file does not exists
+    let _file = vfat.get_path(file_path.as_str().into()).unwrap_err();
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn test_big_write_and_read() -> vfat_rs::Result<()> {
+    /// Write and read back a big file
+    let (file_name, file_path) = random_name("big_write");
+    let mut vfat = init_vfat()?;
+    let mut root = vfat.get_root()?;
+
+    // 2. assert file does not exists
+    vfat.path_exists(file_path.as_str().into())
+        .expect("File already exists. Please delete it.");
+
+    // 3. create file
+    let res = root
+        .create(file_name.clone(), EntryType::File)
+        .expect("Cannote create file");
+
+    // 4. Write CONTENT to file
+    const CONTENT: &[u8] = b"Hello, world! This is Vfat\n";
+    let mut as_file = res.into_file().expect("Into file");
+    for i in 0..50 {
+        as_file.write_all(CONTENT).expect("write all");
+        println!("i: {}, asfile: {:?}", i, as_file);
+    }
+
+    let mut as_file = vfat
+        .get_path(file_path.as_str().into())
+        .unwrap()
+        .into_file()
+        .unwrap();
+
+    println!("File's metadata: {:?}", as_file.metadata());
+    assert_eq!(
+        as_file.metadata().size(),
+        CONTENT.len() * 50,
+        "File's metadata size is wrong."
+    );
+
+    // 5. Read CONTENT back
+    as_file.seek(SeekFrom::Start(0)).unwrap();
+    for i in 0..50 {
+        let mut buf = [0; CONTENT.len()];
+        as_file.read(&mut buf).expect("Read exact");
+        println!("Read: {}", String::from_utf8_lossy(&buf));
+        println!("{:?}", as_file);
+        assert_eq!(buf, CONTENT, "long file write, read failed {}", i);
+    }
 
     root.delete(file_name).expect("delete file");
     // 6. assert file does not exists

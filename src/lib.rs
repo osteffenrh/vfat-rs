@@ -10,6 +10,7 @@
 #![allow(clippy::blocks_in_if_conditions)]
 
 extern crate alloc;
+extern crate core;
 
 use crate::extended_bios_parameter_block::FullExtendedBIOSParameterBlock;
 use alloc::sync::Arc;
@@ -123,7 +124,6 @@ impl VfatFS {
         let sector_size = device.sector_size();
         let cached_partition = CachedPartition::new(device);
         let sectors_per_fat = full_ebpb.extended.sectors_per_fat;
-        // TODO: use a proper error type.
         if full_ebpb.extended.signature != EBPF_VFAT_MAGIC
             && full_ebpb.extended.signature != EBPF_VFAT_MAGIC_ALT
         {

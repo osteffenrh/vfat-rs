@@ -68,20 +68,23 @@ impl ClusterReader {
         }
 
         let mut total_amount_read = 0;
-
+        let buf_len = buf.len();
         // Until buffer is full or I have read the whole cluster:
-        while total_amount_read < buf.len() && self.current_sector < self.final_sector {
+        while total_amount_read < buf_len && self.current_sector < self.final_sector {
             let mut mutex = self.device.as_ref();
             debug!(
                 "Cluster reader, current sector: {current_sector}, Reading starting from {reading_start}",
                 reading_start = total_amount_read + self.offset_byte_in_current_sector,
                 current_sector = self.current_sector,
             );
+            let space_left_in_current_sector =
+                self.sector_size - self.offset_byte_in_current_sector;
             let amount_read = mutex.lock(|device| {
                 device.read_sector_offset(
                     self.current_sector,
                     self.offset_byte_in_current_sector,
-                    &mut buf[total_amount_read..],
+                    &mut buf
+                        [total_amount_read..core::cmp::min(buf_len, space_left_in_current_sector)],
                 )
             })?;
             debug!(
@@ -90,8 +93,10 @@ impl ClusterReader {
             );
             total_amount_read += amount_read;
             self.offset_byte_in_current_sector += amount_read;
+
             assert!(self.offset_byte_in_current_sector <= self.sector_size);
-            if total_amount_read % self.sector_size == 0 {
+
+            if self.offset_byte_in_current_sector == self.sector_size {
                 self.current_sector = SectorId(self.current_sector.0 + 1);
                 self.offset_byte_in_current_sector = 0;
             }

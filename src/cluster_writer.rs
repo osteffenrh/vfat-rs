@@ -59,33 +59,37 @@ impl ClusterWriter {
         }
         let mut total_written = 0;
         while total_written < buf.len() && !self.is_over() {
-            info!("CW: Total written: {}", total_written);
-            info!(
-                "CW: Current sector: {}, offset_byte: {}",
-                self.current_sector, self.offset_byte_in_current_sector
-            );
+            debug!("CW: Total written: {}", total_written);
             let mut mutex = self.device.as_ref();
+            let space_left_in_current_sector =
+                self.sector_size - self.offset_byte_in_current_sector;
             let amount_written = mutex.lock(|device| {
                 device.write_sector_offset(
                     self.current_sector,
                     self.offset_byte_in_current_sector,
-                    &buf[total_written..],
+                    &buf[total_written
+                        ..core::cmp::min(total_written + space_left_in_current_sector, buf.len())],
                 )
             })?;
-            info!("CW: amount written: {}", amount_written);
-
             total_written += amount_written;
             self.offset_byte_in_current_sector += amount_written;
+            debug!(
+                "CW: Amount written: {}, total written: {}, Current sector: {}, offset_byte: {}, sector size: {}",
+                amount_written,
+                total_written,
+                self.current_sector,
+                self.offset_byte_in_current_sector,
+                self.sector_size
+            );
             assert!(self.offset_byte_in_current_sector <= self.sector_size);
 
-            // FIXME: Is this right?
             if self.offset_byte_in_current_sector == self.sector_size {
-                info!("Sector is finished, going to switch sector...");
+                debug!("Sector is finished, going to switch sector...");
                 self.current_sector = SectorId(self.current_sector.0 + 1);
                 self.offset_byte_in_current_sector = 0;
             }
         }
-        info!("CW: Written in total: {}", total_written);
+        debug!("CW: Written in total: {}", total_written);
         Ok(total_written)
     }
 
@@ -123,6 +127,7 @@ impl ClusterChainWriter {
             cluster_writer,
         }
     }
+
     ///
     /// start_sector: start on a different sector other then the one at beginning of the cluster.
     pub fn new(vfat_filesystem: VfatFS, start_cluster: ClusterId) -> Self {
@@ -166,14 +171,14 @@ impl ClusterChainWriter {
         // Finally, calculate the offset in the selected sector:
         let offset_in_sector = offset % self.vfat_filesystem.sector_size;
         info!(
-            "Offset: {}, cluster_offset: {}, sector offset: {}, offset in sector: {}",
-            offset, cluster_offset, sector_offset, offset_in_sector
+            "Offset: {}, cluster_offset: {}, sector offset: {}, offset in sector: {}, current cluster: {:?}",
+            offset, cluster_offset, sector_offset, offset_in_sector, self.current_cluster
         );
         for _ in 0..cluster_offset {
             // Allocates cluster if needed:
             self.current_cluster = self.next_cluster()?;
         }
-
+        info!("Current cluster: {:?}", self.current_cluster);
         self.cluster_writer = ClusterWriter::new_offset(
             self.vfat_filesystem.device.clone(),
             self.vfat_filesystem
@@ -190,17 +195,19 @@ impl ClusterChainWriter {
         if self.current_cluster.is_none() {
             return Ok(None);
         }
-        fat_reader::next_cluster(
+        let mut ret = fat_reader::next_cluster(
             self.current_cluster.unwrap(),
             self.vfat_filesystem.sector_size,
             self.vfat_filesystem.device.clone(),
             self.vfat_filesystem.fat_start_sector,
-        )
-        .or_else(|_| {
-            self.vfat_filesystem
-                .allocate_cluster_to_chain(self.current_cluster.unwrap())
-                .map(Option::from)
-        })
+        )?;
+        if ret.is_none() {
+            ret = Some(
+                self.vfat_filesystem
+                    .allocate_cluster_to_chain(self.current_cluster.unwrap())?,
+            );
+        }
+        Ok(ret)
     }
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         if self.current_cluster.is_none() || buf.is_empty() {
@@ -217,7 +224,10 @@ impl ClusterChainWriter {
                 .is_some(),
             "current cluster is ClusterId(0)."
         );
-        debug!("CCW: Current cluster: {:?}", self.current_cluster);
+        debug!(
+            "CCW: Current cluster: {:?}, offset: {}",
+            self.current_cluster, self.cluster_writer.offset_byte_in_current_sector
+        );
 
         let mut amount_written = 0;
         while amount_written < buf.len() && self.current_cluster.is_some() {

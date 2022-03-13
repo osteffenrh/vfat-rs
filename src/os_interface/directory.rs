@@ -70,6 +70,11 @@ impl From<&str> for Path {
         Self::new(s)
     }
 }
+impl From<String> for Path {
+    fn from(s: String) -> Self {
+        Self::new(s)
+    }
+}
 
 /// This is the public interface to the directory concept.
 #[derive(Debug)]
