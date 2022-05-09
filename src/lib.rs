@@ -8,7 +8,6 @@
 //#![allow(dead_code)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::blocks_in_if_conditions)]
-#![feature(format_args_capture)]
 
 extern crate alloc;
 
