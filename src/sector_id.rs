@@ -6,12 +6,6 @@ use core::ops::Add;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct SectorId(pub u32);
 
-impl From<SectorId> for u64 {
-    fn from(sector_id: SectorId) -> Self {
-        sector_id.0 as u64
-    }
-}
-
 impl From<u32> for SectorId {
     fn from(v: u32) -> Self {
         SectorId(v)

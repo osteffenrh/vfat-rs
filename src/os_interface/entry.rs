@@ -90,11 +90,6 @@ impl VfatEntry {
     }
 }
 
-impl From<VfatFile> for VfatEntry {
-    fn from(file: VfatFile) -> Self {
-        VfatEntry::new_file(file.metadata, file.vfat_filesystem)
-    }
-}
 impl From<VfatDirectory> for VfatEntry {
     fn from(directory: VfatDirectory) -> Self {
         VfatEntry::new_directory(directory.metadata, directory.vfat_filesystem)

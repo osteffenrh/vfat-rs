@@ -13,7 +13,7 @@ use crate::os_interface::directory_entry::{
     UnknownDirectoryEntry, VfatDirectoryEntry,
 };
 use crate::os_interface::{VfatEntry, VfatMetadata};
-use crate::{cluster_writer, ClusterId, VfatFS};
+use crate::{cluster_writer, ClusterId, VfatFS, VfatMetadataTrait};
 use crate::{error, timestamp::VfatTimestamp, SectorId};
 
 // TODO: this assumes sector size...
@@ -117,9 +117,18 @@ impl VfatDirectory {
     pub(crate) fn iter(&self) -> IntoIter<VfatEntry> {
         self.contents().unwrap().into_iter()
     }
-
-    // TODO: it does not check if another file with same name already exists.
+    fn contains(&self, name: &str) -> error::Result<bool> {
+        for entry in self.contents()? {
+            if entry.name() == name {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
     pub fn create(&mut self, name: String, entry_type: EntryType) -> error::Result<VfatEntry> {
+        if self.contains(&name)? {
+            return Err(error::VfatRsError::NameAlreadyInUse { target: name });
+        }
         //1. Create metadata:
         let metadata = self.create_metadata_for_new_entry(name.as_str(), &entry_type)?;
 
@@ -258,12 +267,13 @@ impl VfatDirectory {
             let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
                 unknown_entry_convert_from_bytes_entries(buf);
             debug!("Unknown entries: {:?}", unknown_entries);
+            #[cfg(debug_assertions)]
             unknown_entries
                 .iter()
                 .map(Clone::clone)
                 .map(VfatDirectoryEntry::from)
                 //.take_while(filter_invalid)
-                .for_each(|entry| info!("debug: {:?}", entry));
+                .for_each(|entry| info!("unknown entry to vfat directory entry: {:?}", entry));
 
             unknown_entries
                 .iter()

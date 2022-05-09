@@ -277,6 +277,11 @@ fn test_file_creation() -> vfat_rs::Result<()> {
         .expect("Cannote create file");
 
     vfat.path_exists(used_name_path.into()).unwrap();
+
+    // 4. try to create another file with the same name should fail.
+    root.create(invalid_name.into(), EntryType::File)
+        .unwrap_err();
+
     Ok(())
 }
 
@@ -331,7 +336,7 @@ fn test_file_write(name: &str) -> vfat_rs::Result<()> {
     assert_eq!(CONTENT, &double_buf[..CONTENT.len()], "first half");
     assert_eq!(CONTENT, &double_buf[CONTENT.len()..], "second half");
 
-    root.delete(file_name.to_string()).expect("delete file");
+    root.delete(file_name).expect("delete file");
     // 6. assert file does not exists
     let _file = vfat.get_path(file_path.as_str().into()).unwrap_err();
     Ok(())

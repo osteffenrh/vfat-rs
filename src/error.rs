@@ -15,7 +15,8 @@ pub enum VfatRsError {
     FreeClusterNotFound,
     #[snafu(display("Checked mult failed."))]
     CheckedMulFailed,
-
+    #[snafu(display("A file named '{}' already exists.", target))]
+    NameAlreadyInUse { target: String },
     #[snafu(display("BinRW Error: {}", source))]
     BinRwError { source: BinRwErrorWrapper },
     #[snafu(display("Unsupported vfat partition found, signature: {}", target))]

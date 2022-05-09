@@ -65,9 +65,9 @@ impl From<RawFatEntry> for FatEntry {
         let val = val.0 & lower_28_bits_mask;
         match val {
             0x0 => Unused,
-            0x1 => Reserved(val),
+            //0x1 => Reserved(val),
             0x0000002..=0xFFFFFEF => DataCluster(val),
-            0xFFFFFF0..=0xFFFFFF7 => Reserved(val),
+            //0xFFFFFF0..=0xFFFFFF7 => Reserved(val),
             0xFFFFFF8..=0xFFFFFFF => LastCluster(val),
             val => Reserved(val),
         }
@@ -77,13 +77,12 @@ impl From<RawFatEntry> for FatEntry {
 impl From<FatEntry> for RawFatEntry {
     fn from(fat_entry: FatEntry) -> Self {
         use FatEntry::*;
-        let res = match fat_entry {
+        RawFatEntry(match fat_entry {
             FatEntry::Unused => 0x0,
             Reserved(i) => i,
             DataCluster(i) => i,
             LastCluster(i) => i,
             Id(i) => i,
-        };
-        RawFatEntry(res)
+        })
     }
 }

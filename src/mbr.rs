@@ -35,17 +35,6 @@ impl From<[u8; 512]> for MasterBootRecord {
     }
 }
 
-impl Default for MasterBootRecord {
-    fn default() -> MasterBootRecord {
-        MasterBootRecord {
-            _mbr_bootstrap: [0; 436],
-            disk_id: [0; 10],
-            partitions: [Default::default(); 4],
-            valid_bootsector_sign: [0; 2],
-        }
-    }
-}
-
 impl MasterBootRecord {
     /// Load a MBR from a device T.
     pub fn load<T: BlockDevice>(mut device: T) -> MasterBootRecord {
