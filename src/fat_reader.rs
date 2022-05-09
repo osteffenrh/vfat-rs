@@ -9,7 +9,7 @@ use crate::utils::get_params;
 use crate::{ArcMutex, RawFatEntry, SectorId};
 use crate::{CachedPartition, ClusterId, FatEntry};
 
-pub fn read_fat_entry(
+fn read_fat_entry(
     cluster_id: ClusterId,
     sector_size: usize,
     device: ArcMutex<CachedPartition>,
@@ -32,7 +32,7 @@ pub fn read_fat_entry(
         })
 }
 
-/// Returns the next clusterid after the provided cluster_id.
+/// Returns the next clusterid in the chain after the provided cluster_id, if any.
 pub fn next_cluster(
     cluster_id: ClusterId,
     sector_size: usize,
@@ -41,8 +41,8 @@ pub fn next_cluster(
 ) -> Result<Option<ClusterId>> {
     let fat_entry = read_fat_entry(cluster_id, sector_size, device, fat_start_sector)?;
     info!("Fat entry: {:?}", fat_entry);
-    match fat_entry {
-        FatEntry::DataCluster(id) => Ok(Some(ClusterId::new(id))),
-        _ => Ok(None),
-    }
+    Ok(match fat_entry {
+        FatEntry::DataCluster(id) => Some(ClusterId::new(id)),
+        _ => None,
+    })
 }

@@ -73,10 +73,13 @@ impl VfatEntry {
         VfatDirectory::new(self.vfat_filesystem, self.metadata)
     }
     pub fn into_directory_or_not_found(self) -> Result<VfatDirectory> {
-        // todo: suboptimal, only used if there is an error
-        let name = self.metadata.name().into();
-        self.into_directory()
-            .ok_or(crate::error::VfatRsError::EntryNotFound { target: name })
+        if self.is_dir() {
+            Ok(self.into_directory_unchecked())
+        } else {
+            Err(crate::error::VfatRsError::EntryNotFound {
+                target: self.metadata.name().into(),
+            })
+        }
     }
     fn is_file(&self) -> bool {
         !self.is_dir()

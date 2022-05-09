@@ -8,6 +8,7 @@
 //#![allow(dead_code)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::blocks_in_if_conditions)]
+#![feature(format_args_capture)]
 
 extern crate alloc;
 
@@ -51,10 +52,14 @@ use crate::os_interface::directory_entry::{
 pub use crate::os_interface::EntryType;
 pub use crate::os_interface::Path;
 
+use crate::error::VfatRsError;
 pub use crate::os_interface::{VfatDirectory, VfatEntry, VfatMetadata, VfatMetadataTrait};
 pub use crate::timestamp::VfatTimestamp;
 pub use error::Result;
 use sector_id::SectorId;
+
+const EBPF_VFAT_MAGIC: u8 = 0x28;
+const EBPF_VFAT_MAGIC_ALT: u8 = 0x29;
 
 type ArcMutex<T> = Arc<NullLock<T>>;
 
@@ -120,7 +125,13 @@ impl VfatFS {
         let cached_partition = CachedPartition::new(device);
         let sectors_per_fat = full_ebpb.extended.sectors_per_fat;
         // TODO: use a proper error type.
-        assert!(full_ebpb.extended.signature == 0x28 || full_ebpb.extended.signature == 0x29);
+        if full_ebpb.extended.signature != EBPF_VFAT_MAGIC
+            && full_ebpb.extended.signature != EBPF_VFAT_MAGIC_ALT
+        {
+            return Err(VfatRsError::InvalidVfat {
+                target: full_ebpb.extended.signature,
+            });
+        }
         Ok(VfatFS {
             sector_size,
             device: Arc::new(NullLock::new(cached_partition)),
@@ -154,7 +165,7 @@ impl VfatFS {
         Ok(raw_entry)
     }
 
-    fn get_last_cluster_entry(&self) -> FatEntry {
+    fn new_last_cluster_fat_entry(&self) -> FatEntry {
         FatEntry::LastCluster(self.eoc_marker.get())
     }
 
@@ -175,15 +186,14 @@ impl VfatFS {
         // TODO: assumes sectors size.
         const ENTRIES_BUF_SIZE: usize = 512 / FAT_ENTRY_SIZE;
         const BUF_SIZE: usize = FAT_ENTRY_SIZE * ENTRIES_BUF_SIZE;
-        let sectors_per_fat = self.sectors_per_fat;
-        let fat_start_sector: u64 = self.fat_start_sector.into();
-        for i in 0..sectors_per_fat {
+        // Iterate on each sector.
+        for i in 0..self.sectors_per_fat {
             let mut buf = [0; BUF_SIZE];
             let mut mutex = self.device.as_ref();
-            info!("reading sector: {}/{}", i, sectors_per_fat);
+            info!("reading sector: {}/{}", i, self.sectors_per_fat);
             mutex.lock(|device| {
                 device
-                    .read_sector(SectorId(fat_start_sector as u32 + i), &mut buf)
+                    .read_sector(SectorId(self.fat_start_sector + i), &mut buf)
                     .unwrap();
             });
             let mut raw_entries: [RawFatEntry; ENTRIES_BUF_SIZE] =
@@ -207,11 +217,13 @@ impl VfatFS {
         Ok(None)
     }
 
-    pub fn allocate_cluster_new_entry(&mut self) -> error::Result<ClusterId> {
-        let status = self.get_last_cluster_entry();
+    /// Allocate a cluster for a new file.
+    /// First find an empty cluster. Then set this cluster id as LastCluster
+    pub fn allocate_cluster_new_entry(&self) -> error::Result<ClusterId> {
         let free_cluster_id = self.find_free_cluster()?.ok_or(FreeClusterNotFound)?;
+        let entry = self.new_last_cluster_fat_entry();
         info!("Found free cluster: {}", free_cluster_id);
-        self.write_entry_in_vfat_table(free_cluster_id, status)?;
+        self.write_entry_in_vfat_table(free_cluster_id, entry)?;
         Ok(free_cluster_id)
     }
 
@@ -225,11 +237,7 @@ impl VfatFS {
         let tail_cluster_id = self.get_last_cluster_in_chain(head)?;
         debug!("Tail cluster: {}", tail_cluster_id);
 
-        let free_cluster_id = self.find_free_cluster()?.ok_or(FreeClusterNotFound)?;
-        debug!("Free cluster found: {}", free_cluster_id);
-        let last_entry = self.get_last_cluster_entry();
-        self.write_entry_in_vfat_table(free_cluster_id, last_entry)?;
-        info!("Written cluster");
+        let free_cluster_id = self.allocate_cluster_new_entry()?;
 
         let updated_entry = FatEntry::from_chain(free_cluster_id);
         self.write_entry_in_vfat_table(tail_cluster_id, updated_entry)?;
@@ -252,62 +260,24 @@ impl VfatFS {
 
     pub fn get_last_cluster_in_chain(&self, starting: ClusterId) -> error::Result<ClusterId> {
         info!("Getting last cluster in the chain..");
-        let mut next = starting;
-        while fat_reader::next_cluster(
-            next,
-            self.sector_size,
-            self.device.clone(),
-            self.fat_start_sector,
-        )?
-        .is_some()
-        {
-            next = fat_reader::next_cluster(
-                next,
+        let mut last = starting;
+        loop {
+            match fat_reader::next_cluster(
+                last,
                 self.sector_size,
                 self.device.clone(),
                 self.fat_start_sector,
-            )?
-            .unwrap();
-            info!("next cluster: {}", next);
+            )? {
+                Some(cluster_id) => last = cluster_id,
+                None => return Ok(last),
+            }
         }
-        Ok(next)
-    }
-    pub fn cluster_reader(&self, cluster_id: ClusterId) -> cluster_reader::ClusterReader {
-        cluster_reader::ClusterReader::new(
-            self.device.clone(),
-            cluster_reader::cluster_to_sector(
-                cluster_id,
-                self.sectors_per_cluster,
-                self.data_start_sector,
-            ),
-            self.sectors_per_cluster,
-            self.sector_size,
-        )
-    }
-    pub fn cluster_writer(
-        &self,
-        cluster_id: ClusterId,
-        offset_sector_in_cluster: SectorId,
-        offset_in_sector: usize,
-    ) -> cluster_writer::ClusterWriter {
-        cluster_writer::ClusterWriter::new_offset(
-            self.device.clone(),
-            cluster_reader::cluster_to_sector(
-                cluster_id,
-                self.sectors_per_cluster,
-                self.data_start_sector,
-            ),
-            offset_sector_in_cluster,
-            self.sectors_per_cluster,
-            self.sector_size,
-            offset_in_sector,
-        )
     }
     pub fn cluster_chain_writer(
         &self,
         cluster_id: ClusterId,
     ) -> cluster_writer::ClusterChainWriter {
-        cluster_writer::ClusterChainWriter::new(self.clone(), cluster_id, SectorId(0))
+        cluster_writer::ClusterChainWriter::new(self.clone(), cluster_id)
     }
 
     pub fn cluster_chain_reader(
@@ -380,7 +350,7 @@ impl VfatFS {
         const UNKNOWN_ENTRIES: usize = 1;
         const BUF_SIZE: usize = UNKNOWN_ENTRIES * mem::size_of::<UnknownDirectoryEntry>();
         let mut buf = [0; BUF_SIZE];
-        let mut cluster_reader = self.cluster_reader(self.root_cluster);
+        let mut cluster_reader = self.cluster_chain_reader(self.root_cluster);
         let _ = cluster_reader.read(&mut buf)?;
         let unknown_entries: UnknownDirectoryEntry = buf.into();
         debug!("Unknown entries: {:?}", unknown_entries);

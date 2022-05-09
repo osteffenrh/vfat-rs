@@ -186,9 +186,7 @@ impl VfatDirectory {
         if let EntryType::Directory = entry_type {
             let entries =
                 VfatDirectoryEntry::create_pseudo_dir_entries(metadata.cluster, ClusterId::new(0));
-            let mut cw = self
-                .vfat_filesystem
-                .cluster_writer(metadata.cluster, SectorId(0), 0);
+            let mut cw = self.vfat_filesystem.cluster_chain_writer(metadata.cluster);
             let buf = unknown_entry_convert_to_bytes_2(entries);
             cw.write(&buf)?;
         }
@@ -305,11 +303,9 @@ impl VfatDirectory {
                         regular.last_modification_time,
                         name.clone(),
                         regular.file_size,
-                        // TODO: put parent dir path instead.
                         Path::new(format!(
-                            "{}{}{}",
+                            "{}{name}{}",
                             self.metadata.path(),
-                            name.clone(),
                             if regular.is_dir() { "/" } else { "" }
                         )),
                         regular.cluster(),
@@ -317,10 +313,10 @@ impl VfatDirectory {
                         regular.attributes,
                     );
                     info!(
-                        "dir_entry: name: {:?} - ClusterID: {}, file size: {}",
-                        name.trim_end(),
+                        "dir_entry: name: {name:?} - ClusterID: {}, file size: {}",
                         metadata.cluster,
-                        metadata.size
+                        metadata.size,
+                        name = name.trim_end(),
                     );
                     info!("Metadata: {:?}", metadata);
 
@@ -360,7 +356,6 @@ impl VfatDirectory {
         new_entry: UnknownDirectoryEntry,
     ) -> error::Result<()> {
         info!("Running update entry routine...");
-        // TODO: assumes cluster size:
         let mut buf = [0; BUF_SIZE];
 
         let mut lfn_buff: Vec<(u8, String)> = Vec::new();

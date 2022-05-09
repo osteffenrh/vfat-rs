@@ -5,17 +5,13 @@ use crate::{
 use log::{debug, info};
 
 #[derive(Clone)]
-pub struct ClusterWriter {
+struct ClusterWriter {
     pub device: ArcMutex<CachedPartition>,
     pub sector_size: usize,
-    // TODO: remove, it's only used to calculate current sector
-    pub cluster_start: SectorId,
     pub current_sector: SectorId,
     /// Offset in current_sector. In case buf.len()%sector_size != 0, this sector is not full read.
     /// The next read call will start from this offset.
     pub offset_byte_in_current_sector: usize,
-    // TODO: remove, it's only used to calculate final sector
-    pub sectors_per_cluster: u32,
     final_sector: SectorId,
 }
 
@@ -24,7 +20,6 @@ impl ClusterWriter {
     pub fn new_offset(
         device: ArcMutex<CachedPartition>,
         cluster_start: SectorId,
-        // TODO: rename to current_sector
         offset_sector_in_cluster: SectorId,
         sectors_per_cluster: u32,
         sector_size: usize,
@@ -34,9 +29,7 @@ impl ClusterWriter {
             device,
             sector_size,
             offset_byte_in_current_sector,
-            cluster_start,
             current_sector: cluster_start + offset_sector_in_cluster,
-            sectors_per_cluster,
             final_sector: SectorId(sectors_per_cluster) + cluster_start,
         }
     }
@@ -132,16 +125,12 @@ impl ClusterChainWriter {
     }
     ///
     /// start_sector: start on a different sector other then the one at beginning of the cluster.
-    pub fn new(
-        vfat_filesystem: VfatFS,
-        start_cluster: ClusterId,
-        offset_sector_in_cluster: SectorId,
-    ) -> Self {
+    pub fn new(vfat_filesystem: VfatFS, start_cluster: ClusterId) -> Self {
         let cluster_start = vfat_filesystem.cluster_to_sector(start_cluster);
         let cluster_writer = ClusterWriter::new(
             vfat_filesystem.device.clone(),
             cluster_start,
-            offset_sector_in_cluster,
+            SectorId(0),
             vfat_filesystem.sectors_per_cluster,
             vfat_filesystem.sector_size,
         );

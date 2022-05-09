@@ -18,7 +18,8 @@ pub enum VfatRsError {
 
     #[snafu(display("BinRW Error: {}", source))]
     BinRwError { source: BinRwErrorWrapper },
-
+    #[snafu(display("Unsupported vfat partition found, signature: {}", target))]
+    InvalidVfat { target: u8 },
     #[snafu(display("Impossible delete non empty directory: {}", target))]
     NonEmptyDirectory { target: String },
     #[snafu(display("File not found: '{}'", target))]

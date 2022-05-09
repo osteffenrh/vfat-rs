@@ -359,8 +359,7 @@ impl VfatDirectoryEntry {
         let mut buff_b = name;
         // Calculate how many lfns we will need.
         const SINGLE_LFN_SIZE: f64 = 5.0 + 6.0 + 2.0;
-        // TODO: this cast to u8 might overflow. this is because lfn have a limit in length.
-        // in that case we should error.
+        // TODO: this cast to u8 might overflow. this is because lfn have a limit in length. in that case we should error.
         let required_lfns = (name.len() as f64 / SINGLE_LFN_SIZE).ceil() as u8;
         debug!("Required LFNS: {}", required_lfns);
         // Other then for stopping the loop below, it's also useful for the SequenceNumber attribute.
@@ -397,8 +396,7 @@ impl VfatDirectoryEntry {
                 info!("After: {:?}", sequence_number);
             }
             info!(
-                "Sequence Number: {:?}, position = {}, required lfns = {}",
-                sequence_number, position, required_lfns
+                "Sequence Number: {sequence_number:?}, position = {position}, required lfns = {required_lfns}"
             );
 
             let lfn_entry = LongFileNameEntry {

@@ -9,6 +9,7 @@ alignment=$((1<<20))
 # ceil(size, 1MB):
 size=$(( (size + alignment - 1)/alignment * alignment ))
 
+# TODO: randomize.
 temp_dir=/tmp/irisos_fat32/
 diskimg=fat32.fs
 
@@ -16,6 +17,10 @@ echo "setup.sh: going to create an fs in ${temp_dir}${diskimg}";
 
 # From: https://unix.stackexchange.com/a/527217/61495
 # Filename of resulting disk image
+if [ -d "$temp_dir"] ; then
+  rm -rf $temp_dir
+fi
+
 mkdir -p $temp_dir
 cd $temp_dir
 

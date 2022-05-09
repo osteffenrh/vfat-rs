@@ -18,14 +18,13 @@ pub fn cluster_to_sector(
 /// It's not thread-safe and should not be shared.
 /// Given a buffer buf, it will try to read as much sectors as it can in order to fill the buffer.
 #[derive(Clone)]
-pub struct ClusterReader {
+struct ClusterReader {
     pub device: ArcMutex<CachedPartition>,
     pub sector_size: usize,
     pub current_sector: SectorId,
     /// Offset in current_sector. In case buf.len()%sector_size != 0, this sector is not full read.
     /// The next read call will start from this offset.
     pub offset_byte_in_current_sector: usize,
-    pub start_sector: SectorId,
     // TODO: rm, it's only used to set final_sector.
     pub sectors_per_cluster: u32,
     final_sector: SectorId,
@@ -41,7 +40,6 @@ impl ClusterReader {
             device,
             current_sector: start_sector,
             offset_byte_in_current_sector: 0,
-            start_sector,
             sector_size,
             sectors_per_cluster,
             final_sector: start_sector + SectorId(sectors_per_cluster),
@@ -58,26 +56,26 @@ impl ClusterReader {
             device,
             current_sector: start_sector,
             offset_byte_in_current_sector,
-            start_sector,
             sector_size,
             sectors_per_cluster,
             final_sector: start_sector + SectorId(sectors_per_cluster),
         }
     }
     pub(crate) fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        if self.current_sector >= self.final_sector || buf.is_empty() {
+        let cluster_is_over = self.current_sector >= self.final_sector;
+        if cluster_is_over || buf.is_empty() {
             return Ok(0);
         }
 
         let mut total_amount_read = 0;
 
-        // Until buffer is full or I have read to read the whole cluster:
+        // Until buffer is full or I have read the whole cluster:
         while total_amount_read < buf.len() && self.current_sector < self.final_sector {
             let mut mutex = self.device.as_ref();
             debug!(
-                "Cluster reader, current sector: {}, Reading starting from {}",
-                self.current_sector,
-                total_amount_read + self.offset_byte_in_current_sector
+                "Cluster reader, current sector: {current_sector}, Reading starting from {reading_start}",
+                reading_start = total_amount_read + self.offset_byte_in_current_sector,
+                current_sector = self.current_sector,
             );
             let amount_read = mutex.lock(|device| {
                 device.read_sector_offset(
