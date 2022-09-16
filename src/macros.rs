@@ -42,7 +42,7 @@ macro_rules! define_mask {
 macro_rules! define_bitfield {
     ($field:ident, $size:ident, [$($end:tt - $beg:tt)|*]) => {
         #[allow(non_upper_case_globals)]
-        pub const $field: $size = $( crate::define_mask!($end, $beg) )|*;
+        pub const $field: $size = $( $crate::define_mask!($end, $beg) )|*;
     };
 }
 
@@ -109,7 +109,7 @@ macro_rules! defbit {
                 self
             }
 
-            $( crate::define_bitfield!($field, $size, $bits); )*
+            $( $crate::define_bitfield!($field, $size, $bits); )*
         }
     }
 }

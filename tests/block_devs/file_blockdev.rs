@@ -50,7 +50,7 @@ impl BlockDevice for FilebackedBlockDevice {
     ) -> vfat_rs::Result<usize> {
         use std::io::Write;
         let final_destination = sector.0 as u64 * self.sector_size() as u64 + offset as u64;
-        println!(
+        debug!(
             "Seeking to : sector: {}, sector_size: {}, offset: {}, final destination: {} ",
             sector,
             self.sector_size(),
@@ -60,9 +60,9 @@ impl BlockDevice for FilebackedBlockDevice {
         self.image
             .seek(SeekFrom::Start(final_destination))
             .expect("Error seek");
-        println!("Writing the buffer to the image..");
+        debug!("Writing the buffer to the image..");
         self.image.write_all(buf).expect("Write sector");
-        println!("Written: {}", buf.len());
+        debug!("Written: {}", buf.len());
         Ok(buf.len())
     }
 

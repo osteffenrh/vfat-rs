@@ -6,13 +6,12 @@ use std::sync::Arc;
 use log::info;
 use rand::Rng;
 use serial_test::serial;
+use spin::mutex::SpinMutex;
 
 use block_devs::{ArrayBackedBlockDevice, FilebackedBlockDevice};
 use vfat_rs::mbr::MasterBootRecord;
 use vfat_rs::sector_id::SectorId;
-use vfat_rs::{
-    mbr, BlockDevice, CachedPartition, ClusterId, EntryType, NullLock, Path, RawFatEntry, VfatFS,
-};
+use vfat_rs::{mbr, BlockDevice, CachedPartition, ClusterId, EntryType, Path, RawFatEntry, VfatFS};
 
 mod block_devs;
 mod common;
@@ -230,8 +229,8 @@ fn test_find_next_free() {
         arr: ret,
         read_iteration: 0,
     };
-    let vfat = vfat_rs::VfatFS {
-        device: Arc::new(NullLock::new(CachedPartition::new(dev))),
+    let vfat = VfatFS {
+        device: Arc::new(SpinMutex::new(CachedPartition::new(dev))),
         fat_start_sector: SectorId(0),
         data_start_sector: SectorId(2),
         sectors_per_cluster: 1,
@@ -320,7 +319,7 @@ fn test_file_write(name: &str) -> vfat_rs::Result<()> {
     as_file.seek(SeekFrom::Start(0)).unwrap();
     let mut buf = [0; CONTENT.len()];
     as_file.read(&mut buf).expect("Read exact");
-    println!("Read: {}", String::from_utf8_lossy(&buf));
+    info!("Read: {}", String::from_utf8_lossy(&buf));
     assert_eq!(buf, CONTENT, "simple write failed");
 
     as_file.write(CONTENT).expect("second write");
@@ -341,10 +340,37 @@ fn test_file_write(name: &str) -> vfat_rs::Result<()> {
     Ok(())
 }
 
+pub fn convert(num: f64) -> String {
+    use std::cmp;
+    let negative = if num.is_sign_positive() { "" } else { "-" };
+    let num = num.abs();
+    let units = ["B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    if num < 1_f64 {
+        return format!("{}{} {}", negative, num, "B");
+    }
+    let delimiter = 1000_f64;
+    let exponent = cmp::min(
+        (num.ln() / delimiter.ln()).floor() as i32,
+        (units.len() - 1) as i32,
+    );
+    let pretty_bytes = format!("{:.2}", num / delimiter.powi(exponent))
+        .parse::<f64>()
+        .unwrap()
+        * 1_f64;
+    let unit = units[exponent as usize];
+    format!("{}{} {}", negative, pretty_bytes, unit)
+}
+
 #[test]
 #[serial]
 fn test_big_write_and_read() -> vfat_rs::Result<()> {
-    /// Write and read back a big file
+    // Write and read back a big file
+    // The file size will be ITERATIONS * CONTENT.len()
+    const ITERATIONS: usize = 4000;
+    println!(
+        "Starting big write and read, filesize will be: {}",
+        convert(ITERATIONS as f64 * CONTENT.len() as f64)
+    );
     let (file_name, file_path) = random_name("big_write");
     let mut vfat = init_vfat()?;
     let mut root = vfat.get_root()?;
@@ -361,9 +387,8 @@ fn test_big_write_and_read() -> vfat_rs::Result<()> {
     // 4. Write CONTENT to file
     const CONTENT: &[u8] = b"Hello, world! This is Vfat\n";
     let mut as_file = res.into_file().expect("Into file");
-    for i in 0..50 {
+    for _ in 0..ITERATIONS {
         as_file.write_all(CONTENT).expect("write all");
-        println!("i: {}, asfile: {:?}", i, as_file);
     }
 
     let mut as_file = vfat
@@ -375,17 +400,15 @@ fn test_big_write_and_read() -> vfat_rs::Result<()> {
     println!("File's metadata: {:?}", as_file.metadata());
     assert_eq!(
         as_file.metadata().size(),
-        CONTENT.len() * 50,
+        CONTENT.len() * ITERATIONS,
         "File's metadata size is wrong."
     );
 
     // 5. Read CONTENT back
     as_file.seek(SeekFrom::Start(0)).unwrap();
-    for i in 0..50 {
+    for i in 0..ITERATIONS {
         let mut buf = [0; CONTENT.len()];
         as_file.read(&mut buf).expect("Read exact");
-        println!("Read: {}", String::from_utf8_lossy(&buf));
-        println!("{:?}", as_file);
         assert_eq!(buf, CONTENT, "long file write, read failed {}", i);
     }
 

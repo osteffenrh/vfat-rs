@@ -17,7 +17,7 @@ impl CachedPartition {
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        todo!();
+        todo!()
     }
 }
 /*

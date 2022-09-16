@@ -1,6 +1,5 @@
 use crate::{
-    error, fat_reader, ArcMutex, BlockDevice, CachedPartition, ClusterId, MutexTrait, Result,
-    SectorId, VfatFS,
+    fat_reader, ArcMutex, BlockDevice, CachedPartition, ClusterId, Result, SectorId, VfatFS,
 };
 use log::{debug, info};
 
@@ -60,17 +59,15 @@ impl ClusterWriter {
         let mut total_written = 0;
         while total_written < buf.len() && !self.is_over() {
             debug!("CW: Total written: {}", total_written);
-            let mut mutex = self.device.as_ref();
             let space_left_in_current_sector =
                 self.sector_size - self.offset_byte_in_current_sector;
-            let amount_written = mutex.lock(|device| {
-                device.write_sector_offset(
-                    self.current_sector,
-                    self.offset_byte_in_current_sector,
-                    &buf[total_written
-                        ..core::cmp::min(total_written + space_left_in_current_sector, buf.len())],
-                )
-            })?;
+            let mut dev_lock = self.device.as_ref().lock();
+            let amount_written = (*dev_lock).write_sector_offset(
+                self.current_sector,
+                self.offset_byte_in_current_sector,
+                &buf[total_written
+                    ..core::cmp::min(total_written + space_left_in_current_sector, buf.len())],
+            )?;
             total_written += amount_written;
             self.offset_byte_in_current_sector += amount_written;
             debug!(
@@ -94,8 +91,8 @@ impl ClusterWriter {
     }
 
     fn _flush(&mut self) -> core::result::Result<(), binrw::io::Error> {
-        let mut mutex = self.device.as_ref();
-        Ok(mutex.lock(|dev| dev.flush())?)
+        let mut dev_lock = self.device.lock();
+        Ok((*dev_lock).flush()?)
     }
 }
 
@@ -158,7 +155,7 @@ impl ClusterChainWriter {
         )
     }
     // TODO: move to impl Seek trait.
-    pub fn seek(&mut self, offset: usize) -> error::Result<()> {
+    pub fn seek(&mut self, offset: usize) -> Result<()> {
         // Calculate in which cluster this offset falls:
         let cluster_size =
             self.vfat_filesystem.sectors_per_cluster as usize * self.vfat_filesystem.sector_size;
@@ -191,7 +188,7 @@ impl ClusterChainWriter {
 
         Ok(())
     }
-    fn next_cluster(&mut self) -> error::Result<Option<ClusterId>> {
+    fn next_cluster(&mut self) -> Result<Option<ClusterId>> {
         if self.current_cluster.is_none() {
             return Ok(None);
         }
@@ -247,7 +244,7 @@ impl ClusterChainWriter {
     }
 
     fn _flush(&mut self) -> Result<()> {
-        let mut mutex = self.vfat_filesystem.device.as_ref();
-        mutex.lock(|device| device.flush())
+        let mut dev_lock = self.vfat_filesystem.device.as_ref().lock();
+        (*dev_lock).flush()
     }
 }

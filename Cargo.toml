@@ -15,14 +15,15 @@ std = []
 [dependencies]
 log = "~0.4"
 snafu = {version = "~0.7", default-features = false}
-binrw = {version = "~0.8", default-features = false}
+binrw = {version = "~0.9", default-features = false}
 regex = "1.4.6"
-uluru = "1.1.1"
+uluru = "3.0.0"
+spin = "0.9.4"
 
 [dev-dependencies]
-env_logger = "~0.8"
+env_logger = "~0.9"
 rand = "~0.8"
-serial_test = "~0.5"
+serial_test = "~0.9"
 lazy_static = "~1.4"
 chrono = "~0.4"
 

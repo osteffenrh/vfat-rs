@@ -1,7 +1,7 @@
 use log::{debug, info};
 
 use crate::cache::CachedPartition;
-use crate::{error, fat_reader, ArcMutex, BlockDevice, ClusterId, MutexTrait, Result, SectorId};
+use crate::{fat_reader, ArcMutex, BlockDevice, ClusterId, Result, SectorId};
 
 pub fn cluster_to_sector(
     cluster: ClusterId,
@@ -71,22 +71,21 @@ impl ClusterReader {
         let buf_len = buf.len();
         // Until buffer is full or I have read the whole cluster:
         while total_amount_read < buf_len && self.current_sector < self.final_sector {
-            let mut mutex = self.device.as_ref();
             debug!(
                 "Cluster reader, current sector: {current_sector}, Reading starting from {reading_start}",
                 reading_start = total_amount_read + self.offset_byte_in_current_sector,
                 current_sector = self.current_sector,
             );
+
             let space_left_in_current_sector =
                 self.sector_size - self.offset_byte_in_current_sector;
-            let amount_read = mutex.lock(|device| {
-                device.read_sector_offset(
-                    self.current_sector,
-                    self.offset_byte_in_current_sector,
-                    &mut buf
-                        [total_amount_read..core::cmp::min(buf_len, space_left_in_current_sector)],
-                )
-            })?;
+            let mut dev_lock = self.device.lock();
+            let amount_read = (*dev_lock).read_sector_offset(
+                self.current_sector,
+                self.offset_byte_in_current_sector,
+                &mut buf[total_amount_read..core::cmp::min(buf_len, space_left_in_current_sector)],
+            )?;
+
             debug!(
                 "ClusterReader: Current Sector: {}, Amount read: {}",
                 self.current_sector, amount_read
@@ -155,7 +154,7 @@ impl ClusterChainReader {
             last_cluster_read: cluster_to_read,
         }
     }
-    fn next_cluster(&self) -> error::Result<Option<ClusterId>> {
+    fn next_cluster(&self) -> Result<Option<ClusterId>> {
         if self.current_cluster.is_none() {
             return Ok(None);
         }
@@ -168,7 +167,7 @@ impl ClusterChainReader {
     }
 
     /// Assumptions: offset less then this object's size.
-    pub fn seek(&mut self, offset: usize) -> error::Result<()> {
+    pub fn seek(&mut self, offset: usize) -> Result<()> {
         // Calculate in which cluster this offset falls:
         let cluster_size = self.sectors_per_cluster as usize * self.sector_size;
         let cluster_offset = (offset as f64 / cluster_size as f64) as usize; // TODO: check if it's going to floor. apparently floor was removed from core?!

@@ -16,7 +16,7 @@ use crate::os_interface::{VfatEntry, VfatMetadata};
 use crate::{cluster_writer, ClusterId, VfatFS, VfatMetadataTrait};
 use crate::{error, timestamp::VfatTimestamp, SectorId};
 
-// TODO: this assumes sector size...
+// TODO: this assumes sector size
 const SECTOR_SIZE: usize = 512;
 const ENTRIES_AMOUNT: usize = SECTOR_SIZE / mem::size_of::<UnknownDirectoryEntry>();
 const BUF_SIZE: usize = mem::size_of::<UnknownDirectoryEntry>() * ENTRIES_AMOUNT;
@@ -38,9 +38,7 @@ pub struct Path(pub String);
 
 impl Path {
     pub fn new<S: AsRef<str>>(path: S) -> Self {
-        Self {
-            0: String::from(path.as_ref()),
-        }
+        Self(String::from(path.as_ref()))
     }
     pub fn as_parts(&self) -> impl Iterator<Item = &str> {
         self.0.split_terminator('/')

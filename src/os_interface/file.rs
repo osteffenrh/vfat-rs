@@ -5,7 +5,7 @@ use core::{cmp, fmt};
 use log::{debug, info};
 
 use crate::os_interface::VfatMetadata;
-use crate::{error, ClusterId, MutexTrait, Result, VfatFS};
+use crate::{error, ClusterId, Result, VfatFS};
 
 /// A File representation in a VfatFilesystem.
 //#[derive(Clone)]
@@ -37,7 +37,7 @@ impl VfatFile {
         &self.metadata
     }
 
-    pub fn update_file_size(&mut self, amount_written: usize) -> error::Result<()> {
+    pub fn update_file_size(&mut self, amount_written: usize) -> Result<()> {
         if self.offset + amount_written <= self.metadata.size as usize {
             return Ok(());
         }
@@ -54,7 +54,7 @@ impl VfatFile {
         self.update_metadata()
     }
 
-    pub fn update_metadata(&mut self) -> error::Result<()> {
+    pub fn update_metadata(&mut self) -> Result<()> {
         debug!("Going to update metadata on disk...");
         self.vfat_filesystem
             .get_path(self.metadata.parent().clone())?
@@ -96,8 +96,8 @@ impl VfatFile {
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        let mut mutex = self.vfat_filesystem.device.as_ref();
-        mutex.lock(|dev| dev.flush())
+        let mut dev_lock = self.vfat_filesystem.device.as_ref().lock();
+        (*dev_lock).flush()
     }
 
     pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {

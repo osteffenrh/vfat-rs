@@ -1,9 +1,8 @@
 use log::info;
 
-use crate::device::BlockDevice;
 use crate::error::Result;
 use crate::utils::get_params;
-use crate::{ArcMutex, CachedPartition, ClusterId, FatEntry, MutexTrait, SectorId};
+use crate::{ArcMutex, BlockDevice, CachedPartition, ClusterId, FatEntry, SectorId};
 
 pub fn set_fat_entry(
     cluster_id: ClusterId,
@@ -18,8 +17,8 @@ pub fn set_fat_entry(
         "Requested cid: {}, containing sector: {}, offset in sector: {}",
         cluster_id, sector, offset
     );
-    let mut mutex = device.as_ref();
-    mutex.lock(|dev| dev.write_sector_offset(sector, offset, &entry.as_buff()))?;
+    let mut mutex = device.as_ref().lock();
+    (*mutex).write_sector_offset(sector, offset, &entry.as_buff())?;
     Ok(())
 }
 

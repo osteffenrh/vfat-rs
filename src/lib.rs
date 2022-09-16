@@ -18,6 +18,7 @@ use binrw::io::Cursor;
 use binrw::BinReaderExt;
 use core::{fmt, mem};
 use log::{debug, info};
+use spin::mutex::SpinMutex;
 
 mod cache;
 mod cluster_id;
@@ -30,7 +31,6 @@ mod extended_bios_parameter_block;
 mod fat_entry;
 mod fat_reader;
 mod fat_writer;
-mod lock;
 mod macros;
 /// A simple Master Booot Record implementation
 pub mod mbr;
@@ -45,7 +45,6 @@ pub use crate::device::BlockDevice;
 use crate::error::VfatRsError::FreeClusterNotFound;
 use crate::fat_entry::FatEntry;
 pub use crate::fat_entry::RawFatEntry;
-pub use crate::lock::{MutexTrait, NullLock};
 use crate::os_interface::directory_entry::{
     Attributes, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
 };
@@ -61,7 +60,7 @@ use sector_id::SectorId;
 const EBPF_VFAT_MAGIC: u8 = 0x28;
 const EBPF_VFAT_MAGIC_ALT: u8 = 0x29;
 
-type ArcMutex<T> = Arc<NullLock<T>>;
+type ArcMutex<T> = Arc<SpinMutex<T>>;
 
 #[derive(Clone)]
 pub struct VfatFS {
@@ -91,7 +90,7 @@ impl VfatFS {
     pub fn new<B: BlockDevice + 'static>(
         mut device: B,
         partition_start_sector: u32,
-    ) -> error::Result<Self> {
+    ) -> Result<Self> {
         let full_ebpb = Self::read_fullebpb(&mut device, partition_start_sector)?;
         Self::new_with_ebpb(device, partition_start_sector, full_ebpb)
     }
@@ -99,7 +98,7 @@ impl VfatFS {
     pub fn read_fullebpb<B: BlockDevice>(
         device: &mut B,
         start_sector: u32,
-    ) -> error::Result<FullExtendedBIOSParameterBlock> {
+    ) -> Result<FullExtendedBIOSParameterBlock> {
         let mut buff = [0u8; 512];
         device.read_sector(start_sector.into(), &mut buff)?;
         Ok(Cursor::new(&buff).read_le()?)
@@ -110,7 +109,7 @@ impl VfatFS {
         mut device: B,
         partition_start_sector: u32,
         full_ebpb: FullExtendedBIOSParameterBlock,
-    ) -> error::Result<Self> {
+    ) -> Result<Self> {
         let fat_start_sector =
             (partition_start_sector + full_ebpb.bpb.reserved_sectors as u32).into();
         let fats_total_size = full_ebpb.extended.sectors_per_fat * full_ebpb.bpb.fat_amount as u32;
@@ -133,7 +132,7 @@ impl VfatFS {
         }
         Ok(VfatFS {
             sector_size,
-            device: Arc::new(NullLock::new(cached_partition)),
+            device: Arc::new(SpinMutex::new(cached_partition)),
             fat_start_sector,
             data_start_sector,
             sectors_per_cluster,
@@ -150,11 +149,11 @@ impl VfatFS {
     fn read_end_of_chain_marker<B>(
         device: &mut B,
         fat_start_sector: SectorId,
-    ) -> error::Result<RawFatEntry>
+    ) -> Result<RawFatEntry>
     where
         B: BlockDevice,
     {
-        const FAT_ENTRY_SIZE: usize = core::mem::size_of::<RawFatEntry>();
+        const FAT_ENTRY_SIZE: usize = mem::size_of::<RawFatEntry>();
         const ENTRIES_BUF_SIZE: usize = 1;
         const BUF_SIZE: usize = FAT_ENTRY_SIZE * ENTRIES_BUF_SIZE;
         let mut buf = [0; BUF_SIZE];
@@ -188,13 +187,11 @@ impl VfatFS {
         // Iterate on each sector.
         for i in 0..self.sectors_per_fat {
             let mut buf = [0; BUF_SIZE];
-            let mut mutex = self.device.as_ref();
             info!("reading sector: {}/{}", i, self.sectors_per_fat);
-            mutex.lock(|device| {
-                device
-                    .read_sector(SectorId(self.fat_start_sector + i), &mut buf)
-                    .unwrap();
-            });
+            let mut device = self.device.lock();
+            (*device)
+                .read_sector(SectorId(self.fat_start_sector + i), &mut buf)
+                .unwrap();
             let mut raw_entries: [RawFatEntry; ENTRIES_BUF_SIZE] =
                 [Default::default(); ENTRIES_BUF_SIZE];
 
@@ -218,7 +215,7 @@ impl VfatFS {
 
     /// Allocate a cluster for a new file.
     /// First find an empty cluster. Then set this cluster id as LastCluster
-    pub fn allocate_cluster_new_entry(&self) -> error::Result<ClusterId> {
+    pub fn allocate_cluster_new_entry(&self) -> Result<ClusterId> {
         let free_cluster_id = self.find_free_cluster()?.ok_or(FreeClusterNotFound)?;
         let entry = self.new_last_cluster_fat_entry();
         info!("Found free cluster: {}", free_cluster_id);
@@ -230,7 +227,7 @@ impl VfatFS {
     ///  * previous cluster in the chain to point to the newly allocated one,
     /// * new clusterId added as final entry
     /// TODO: invert writes, first update head, and then allocate the cluster.
-    pub fn allocate_cluster_to_chain(&self, head: ClusterId) -> error::Result<ClusterId> {
+    pub fn allocate_cluster_to_chain(&self, head: ClusterId) -> Result<ClusterId> {
         info!("Allocating cluster to chain: {}", head);
         debug!("Head cluster: {}", head);
         let tail_cluster_id = self.get_last_cluster_in_chain(head)?;
@@ -243,11 +240,7 @@ impl VfatFS {
         info!("Updated the entry");
         Ok(free_cluster_id)
     }
-    fn write_entry_in_vfat_table(
-        &self,
-        cluster_id: ClusterId,
-        entry: FatEntry,
-    ) -> error::Result<()> {
+    fn write_entry_in_vfat_table(&self, cluster_id: ClusterId, entry: FatEntry) -> Result<()> {
         fat_writer::set_fat_entry(
             cluster_id,
             self.sector_size,
@@ -257,7 +250,7 @@ impl VfatFS {
         )
     }
 
-    pub fn get_last_cluster_in_chain(&self, starting: ClusterId) -> error::Result<ClusterId> {
+    pub fn get_last_cluster_in_chain(&self, starting: ClusterId) -> Result<ClusterId> {
         info!("Getting last cluster in the chain..");
         let mut last = starting;
         loop {
@@ -294,8 +287,8 @@ impl VfatFS {
     }
 
     /// This will delete all the cluster chain starting from cluster_id.
-    pub fn delete_fat_cluster_chain(&self, cluster_id: ClusterId) -> error::Result<()> {
-        crate::fat_writer::delete_cluster_chain(
+    pub fn delete_fat_cluster_chain(&self, cluster_id: ClusterId) -> Result<()> {
+        fat_writer::delete_cluster_chain(
             cluster_id,
             self.sector_size,
             self.device.clone(),
@@ -330,7 +323,7 @@ impl VfatFS {
                 .last();
             current_entry = matches.ok_or_else(|| {
                 info!("Matches for {} is empty: path not found!", sub_path);
-                error::VfatRsError::EntryNotFound {
+                VfatRsError::EntryNotFound {
                     target: sub_path.into(),
                 }
             })?;
@@ -341,7 +334,7 @@ impl VfatFS {
     pub fn path_exists(&mut self, path: Path) -> Result<bool> {
         let entry = self.get_path(path).map(|_| true);
         match entry {
-            Err(error) if matches!(error, error::VfatRsError::EntryNotFound { .. }) => Ok(false),
+            Err(error) if matches!(error, VfatRsError::EntryNotFound { .. }) => Ok(false),
             x => x,
         }
     }
