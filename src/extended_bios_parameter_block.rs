@@ -30,7 +30,7 @@ pub struct BiosParameterBlock {
     pub sectors_per_fat: u16,
     num_sectors_per_track: u16,
     num_heads_on_storage: u16,
-    num_hiden_sectors: u32,
+    num_hidden_sectors: u32,
     /// Total logical sectors if greater than 65535; otherwise, see num_sectors_per_fat.
     pub total_logical_sectors_gt_u16: u32,
 }

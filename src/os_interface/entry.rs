@@ -1,5 +1,5 @@
+use crate::formats::timestamp::VfatTimestamp;
 use crate::os_interface::{VfatDirectory, VfatFile, VfatMetadata};
-use crate::timestamp::VfatTimestamp;
 use crate::{Result, VfatFS};
 
 #[derive(Debug)]

@@ -9,12 +9,12 @@ use core::{fmt, iter};
 use log::{debug, info};
 use regex::Regex;
 
+use crate::formats::timestamp::VfatTimestamp;
 use crate::os_interface::directory_entry::long_file_name_entry::{
     LongFileNameEntry, SequenceNumber,
 };
 pub use crate::os_interface::directory_entry::regular_entry::RegularDirectoryEntry;
 pub use crate::os_interface::directory_entry::unknown_entry::*;
-use crate::timestamp::VfatTimestamp;
 use crate::{const_assert_size, ClusterId};
 
 mod long_file_name_entry;

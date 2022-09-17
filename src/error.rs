@@ -53,7 +53,7 @@ impl From<binrw::io::Error> for VfatRsError {
         VfatRsError::from(binrw::Error::from(value))
     }
 }
-impl From<binrw::io::ErrorKind> for VfatRsError {
+impl From<ErrorKind> for VfatRsError {
     fn from(value: ErrorKind) -> Self {
         VfatRsError::from(binrw::io::Error::from(value))
     }
@@ -69,6 +69,6 @@ pub enum MbrError {
 impl From<VfatRsError> for binrw::io::Error {
     fn from(_err: VfatRsError) -> Self {
         // TODO: provide useful output
-        binrw::io::ErrorKind::Other.into()
+        ErrorKind::Other.into()
     }
 }

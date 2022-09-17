@@ -9,14 +9,17 @@ impl RawFatEntry {
     pub fn as_buff(self) -> [u8; mem::size_of::<Self>()] {
         self.0.to_le_bytes()
     }
+
     pub fn get(&self) -> u32 {
         self.0
     }
+
     pub fn new_ref(buff: &[u8]) -> Self {
         let mut temp = [0u8; 4];
         temp.copy_from_slice(buff);
         Self::new(temp)
     }
+
     pub fn new(buff: [u8; mem::size_of::<u32>()]) -> Self {
         RawFatEntry(u32::from_le_bytes(buff))
     }
@@ -78,7 +81,7 @@ impl From<FatEntry> for RawFatEntry {
     fn from(fat_entry: FatEntry) -> Self {
         use FatEntry::*;
         RawFatEntry(match fat_entry {
-            FatEntry::Unused => 0x0,
+            Unused => 0x0,
             Reserved(i) => i,
             DataCluster(i) => i,
             LastCluster(i) => i,

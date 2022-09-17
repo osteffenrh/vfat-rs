@@ -4,8 +4,8 @@ use std::cmp::min;
 use std::fs::File;
 use std::io::SeekFrom;
 use std::io::{Read, Seek};
-use vfat_rs::sector_id::SectorId;
 use vfat_rs::BlockDevice;
+use vfat_rs::SectorId;
 
 pub struct FilebackedBlockDevice {
     pub image: File,

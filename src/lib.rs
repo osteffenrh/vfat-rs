@@ -21,41 +21,36 @@ use log::{debug, info};
 use spin::mutex::SpinMutex;
 
 mod cache;
-mod cluster_id;
 mod cluster_reader;
 mod cluster_writer;
 mod device;
 /// NtfsRs error definitions
 mod error;
 mod extended_bios_parameter_block;
-mod fat_entry;
-mod fat_reader;
-mod fat_writer;
+mod fat_table;
+mod formats;
 mod macros;
 /// A simple Master Booot Record implementation
 pub mod mbr;
 mod os_interface;
-pub mod sector_id;
-mod timestamp;
 mod utils;
 
-pub use crate::cache::CachedPartition;
-pub use crate::cluster_id::ClusterId;
 pub use crate::device::BlockDevice;
 use crate::error::VfatRsError::FreeClusterNotFound;
-use crate::fat_entry::FatEntry;
-pub use crate::fat_entry::RawFatEntry;
 use crate::os_interface::directory_entry::{
     Attributes, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
 };
 pub use crate::os_interface::EntryType;
 pub use crate::os_interface::Path;
+pub use cache::CachedPartition;
 
 use crate::error::VfatRsError;
+pub use crate::fat_table::fat_entry::{FatEntry, RawFatEntry};
+use crate::fat_table::{fat_reader, fat_writer};
+pub use crate::formats::cluster_id::ClusterId;
+pub use crate::formats::sector_id::SectorId;
 pub use crate::os_interface::{VfatDirectory, VfatEntry, VfatMetadata, VfatMetadataTrait};
-pub use crate::timestamp::VfatTimestamp;
 pub use error::Result;
-use sector_id::SectorId;
 
 const EBPF_VFAT_MAGIC: u8 = 0x28;
 const EBPF_VFAT_MAGIC_ALT: u8 = 0x29;
@@ -164,6 +159,7 @@ impl VfatFS {
     }
 
     fn new_last_cluster_fat_entry(&self) -> FatEntry {
+        // Last cluster is initialized with the eoc_marker
         FatEntry::LastCluster(self.eoc_marker.get())
     }
 
@@ -178,9 +174,9 @@ impl VfatFS {
     }
 
     /// Find next free cluster
-    pub fn find_free_cluster(&self) -> error::Result<Option<ClusterId>> {
+    pub fn find_free_cluster(&self) -> Result<Option<ClusterId>> {
         info!("Starting find free cluster routine");
-        const FAT_ENTRY_SIZE: usize = core::mem::size_of::<RawFatEntry>();
+        const FAT_ENTRY_SIZE: usize = mem::size_of::<RawFatEntry>();
         // TODO: assumes sectors size.
         const ENTRIES_BUF_SIZE: usize = 512 / FAT_ENTRY_SIZE;
         const BUF_SIZE: usize = FAT_ENTRY_SIZE * ENTRIES_BUF_SIZE;
@@ -199,14 +195,13 @@ impl VfatFS {
                 raw_entries[i] = RawFatEntry::new_ref(bytes);
             }
 
-            for (id, raw) in raw_entries.iter().enumerate() {
-                let cid = (ENTRIES_BUF_SIZE as u32 * i) as u32 + id as u32;
-                debug!("(cid: {:?}) Fat entry: {:?}", FatEntry::from(*raw), cid);
-                if let FatEntry::Unused = FatEntry::from(*raw) {
+            for (id, raw) in raw_entries.into_iter().enumerate() {
+                let cid = (ENTRIES_BUF_SIZE as u32 * i) + id as u32;
+                let fat_entry = FatEntry::from(raw);
+                debug!("(cid: {:?}) Fat entry: {:?}", fat_entry, cid);
+                if let FatEntry::Unused = fat_entry {
                     debug!("Found an unused cluster with id: {}", cid);
-                    return Ok(Some(ClusterId::new(
-                        (ENTRIES_BUF_SIZE as u32 * i) + id as u32,
-                    )));
+                    return Ok(Some(ClusterId::new(cid)));
                 }
             }
         }

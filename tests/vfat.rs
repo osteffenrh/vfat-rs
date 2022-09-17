@@ -10,8 +10,9 @@ use spin::mutex::SpinMutex;
 
 use block_devs::{ArrayBackedBlockDevice, FilebackedBlockDevice};
 use vfat_rs::mbr::MasterBootRecord;
-use vfat_rs::sector_id::SectorId;
-use vfat_rs::{mbr, BlockDevice, CachedPartition, ClusterId, EntryType, Path, RawFatEntry, VfatFS};
+use vfat_rs::{
+    mbr, BlockDevice, CachedPartition, ClusterId, EntryType, Path, RawFatEntry, SectorId, VfatFS,
+};
 
 mod block_devs;
 mod common;

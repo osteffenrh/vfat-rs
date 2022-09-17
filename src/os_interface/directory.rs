@@ -8,13 +8,14 @@ use snafu::ensure;
 
 use crate::cluster_reader::ClusterChainReader;
 use crate::cluster_writer::ClusterChainWriter;
+use crate::error;
+use crate::formats::timestamp::VfatTimestamp;
 use crate::os_interface::directory_entry::{
     unknown_entry_convert_to_bytes_2, Attributes, EntryId, RegularDirectoryEntry,
     UnknownDirectoryEntry, VfatDirectoryEntry,
 };
 use crate::os_interface::{VfatEntry, VfatMetadata};
-use crate::{cluster_writer, ClusterId, VfatFS, VfatMetadataTrait};
-use crate::{error, timestamp::VfatTimestamp, SectorId};
+use crate::{cluster_writer, ClusterId, SectorId, VfatFS, VfatMetadataTrait};
 
 // TODO: this assumes sector size
 const SECTOR_SIZE: usize = 512;

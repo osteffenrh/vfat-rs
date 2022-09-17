@@ -1,5 +1,5 @@
 use crate::{
-    fat_reader, ArcMutex, BlockDevice, CachedPartition, ClusterId, Result, SectorId, VfatFS,
+    error::Result, fat_reader, ArcMutex, BlockDevice, CachedPartition, ClusterId, SectorId, VfatFS,
 };
 use log::{debug, info};
 

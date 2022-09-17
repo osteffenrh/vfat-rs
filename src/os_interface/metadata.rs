@@ -1,6 +1,6 @@
+use crate::formats::timestamp::VfatTimestamp;
 use crate::os_interface::directory_entry::Attributes;
 use crate::os_interface::Path;
-use crate::timestamp::VfatTimestamp;
 use crate::ClusterId;
 use alloc::string::String;
 

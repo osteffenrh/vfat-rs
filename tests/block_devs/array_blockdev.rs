@@ -1,6 +1,6 @@
 use binrw::io::Write;
-use vfat_rs::sector_id::SectorId;
 use vfat_rs::BlockDevice;
+use vfat_rs::SectorId;
 
 pub struct ArrayBackedBlockDevice {
     pub arr: Vec<u8>,
