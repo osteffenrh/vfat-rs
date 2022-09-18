@@ -1,44 +1,18 @@
-use core::mem;
-
 use log::info;
 
-use crate::device::BlockDevice;
 use crate::error::Result;
-use crate::fat_table::get_params;
-use crate::{ArcMutex, RawFatEntry, SectorId};
+use crate::ArcMutex;
 use crate::{CachedPartition, ClusterId, FatEntry};
 
-fn read_fat_entry(
-    cluster_id: ClusterId,
-    sector_size: usize,
-    device: ArcMutex<CachedPartition>,
-    fat_start_sector: SectorId,
-) -> Result<FatEntry> {
-    let (sector, offset) = get_params(sector_size, fat_start_sector, cluster_id)?;
-
-    // so the this cluster id, is the 6th element of the 12th sector.
-    info!(
-        "Requested cid: {}, sector: {}, offset in sector: {}",
-        cluster_id, sector, offset
-    );
-    let mut buf = [0u8; mem::size_of::<RawFatEntry>()];
-    let mut dev_lock = device.as_ref().lock();
-    (*dev_lock)
-        .read_sector_offset(sector, offset, &mut buf)
-        .map(|_| {
-            let raw_entry = RawFatEntry::new(buf);
-            FatEntry::from(raw_entry)
-        })
-}
-
 /// Returns the next clusterid in the chain after the provided cluster_id, if any.
-pub fn next_cluster(
+/// To do that, query the fat table for this cluster id, and see if it is a Data Cluster (e.g. a
+/// node in the chain) return the next element, otherwise it's a dead end and return null.
+pub(crate) fn next_cluster(
     cluster_id: ClusterId,
-    sector_size: usize,
     device: ArcMutex<CachedPartition>,
-    fat_start_sector: SectorId,
 ) -> Result<Option<ClusterId>> {
-    let fat_entry = read_fat_entry(cluster_id, sector_size, device, fat_start_sector)?;
+    let mut dev_lock = device.as_ref().lock();
+    let fat_entry = dev_lock.read_fat_entry(cluster_id)?;
     info!("Fat entry: {:?}", fat_entry);
     Ok(match fat_entry {
         FatEntry::DataCluster(id) => Some(ClusterId::new(id)),

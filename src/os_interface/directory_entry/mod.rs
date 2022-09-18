@@ -68,7 +68,7 @@ const DOT_CHARACTER: u8 = b'.';
 
 impl VfatDirectoryEntry {
     // pseudo dir entries are entries . and ..
-    pub fn create_pseudo_dir_entries(
+    pub(crate) fn create_pseudo_dir_entries(
         current_dir: ClusterId,
         parent_dir: ClusterId,
     ) -> [UnknownDirectoryEntry; 2] {
@@ -222,7 +222,7 @@ impl VfatDirectoryEntry {
     // LongFileName nevertheless. I assume the reason for this is because of different
     // char encoding. LFN uses a subset of utf-16 while RegularFileEntry uses ASCII.
     /// TODO: Support longer filenames.. Now it only creates 1 lfn
-    pub fn new_vfat_entry(
+    pub(crate) fn new_vfat_entry(
         name: &str,
         cluster_id: ClusterId,
         attributes: Attributes,

@@ -104,7 +104,7 @@ pub struct ClusterChainWriter {
     current_cluster: Option<ClusterId>,
 }
 impl ClusterChainWriter {
-    pub fn new_w_offset(
+    pub(crate) fn new_w_offset(
         vfat_filesystem: VfatFS,
         start_cluster: ClusterId,
         offset_sector_in_cluster: SectorId,
@@ -127,7 +127,7 @@ impl ClusterChainWriter {
 
     ///
     /// start_sector: start on a different sector other then the one at beginning of the cluster.
-    pub fn new(vfat_filesystem: VfatFS, start_cluster: ClusterId) -> Self {
+    pub(crate) fn new(vfat_filesystem: VfatFS, start_cluster: ClusterId) -> Self {
         let cluster_start = vfat_filesystem.cluster_to_sector(start_cluster);
         let cluster_writer = ClusterWriter::new(
             vfat_filesystem.device.clone(),
@@ -194,9 +194,7 @@ impl ClusterChainWriter {
         }
         let mut ret = fat_reader::next_cluster(
             self.current_cluster.unwrap(),
-            self.vfat_filesystem.sector_size,
             self.vfat_filesystem.device.clone(),
-            self.vfat_filesystem.fat_start_sector,
         )?;
         if ret.is_none() {
             ret = Some(

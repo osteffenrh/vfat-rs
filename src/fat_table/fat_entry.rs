@@ -1,44 +1,16 @@
-use crate::ClusterId;
-use core::{fmt, mem};
+use crate::{const_assert_size, ClusterId};
+use core::mem;
 
-#[derive(Copy, Clone, Default)]
-#[repr(transparent)]
-pub struct RawFatEntry(u32);
+pub const FAT_ENTRY_SIZE: usize = mem::size_of::<u32>();
 
-impl RawFatEntry {
-    pub fn as_buff(self) -> [u8; mem::size_of::<Self>()] {
-        self.0.to_le_bytes()
-    }
-
-    pub fn get(&self) -> u32 {
-        self.0
-    }
-
-    pub fn new_ref(buff: &[u8]) -> Self {
-        let mut temp = [0u8; 4];
-        temp.copy_from_slice(buff);
-        Self::new(temp)
-    }
-
-    pub fn new(buff: [u8; mem::size_of::<u32>()]) -> Self {
-        RawFatEntry(u32::from_le_bytes(buff))
-    }
-}
-impl From<u32> for RawFatEntry {
-    fn from(val: u32) -> Self {
-        Self(val)
-    }
-}
-impl fmt::Debug for RawFatEntry {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "RawFatEntry(0x{:X})", self.0)
-    }
-}
+const_assert_size!(FatEntry, 8); // TODO: why does this take 8 bytes?! O_o I would expect at most 5
 
 /// A fat32 row entry. Each entry represents a cluster. This is the "high level" view
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[repr(C)]
 pub enum FatEntry {
     /// Entry 0, formatted as 0xFFFFFFFN
+    #[allow(dead_code)]
     Id(u32),
     /// A free, unused cluster. 0x00
     Unused,
@@ -50,22 +22,34 @@ pub enum FatEntry {
     LastCluster(u32),
 }
 
+impl Default for FatEntry {
+    fn default() -> Self {
+        FatEntry::Unused
+    }
+}
+
 impl FatEntry {
     pub(crate) fn from_chain(next: ClusterId) -> Self {
         Self::DataCluster(next.into())
     }
-    pub fn as_buff(self) -> [u8; mem::size_of::<RawFatEntry>()] {
-        let raw_fat: RawFatEntry = self.into();
-        raw_fat.as_buff()
+    pub fn as_buff(self) -> [u8; FAT_ENTRY_SIZE] {
+        let raw_fat: u32 = self.into();
+        raw_fat.to_le_bytes()
+    }
+
+    pub fn new_ref(buff: &[u8]) -> Self {
+        let mut temp = [0u8; 4];
+        temp.copy_from_slice(buff);
+        Self::from(temp)
     }
 }
-
-impl From<RawFatEntry> for FatEntry {
-    fn from(val: RawFatEntry) -> Self {
+impl From<[u8; FAT_ENTRY_SIZE]> for FatEntry {
+    fn from(buff: [u8; FAT_ENTRY_SIZE]) -> Self {
+        let val = u32::from_le_bytes(buff);
         use FatEntry::*;
         let lower_28_bits_mask: u32 = (1 << 28) - 1;
         // The upper 4 bits are ignored.
-        let val = val.0 & lower_28_bits_mask;
+        let val = val & lower_28_bits_mask;
         match val {
             0x0 => Unused,
             //0x1 => Reserved(val),
@@ -77,15 +61,15 @@ impl From<RawFatEntry> for FatEntry {
     }
 }
 
-impl From<FatEntry> for RawFatEntry {
+impl From<FatEntry> for u32 {
     fn from(fat_entry: FatEntry) -> Self {
         use FatEntry::*;
-        RawFatEntry(match fat_entry {
+        match fat_entry {
             Unused => 0x0,
             Reserved(i) => i,
             DataCluster(i) => i,
             LastCluster(i) => i,
             Id(i) => i,
-        })
+        }
     }
 }

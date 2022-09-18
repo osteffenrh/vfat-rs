@@ -1,7 +1,7 @@
 use core::{fmt, ops};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct ClusterId(u32);
+pub(crate) struct ClusterId(u32);
 impl From<ClusterId> for u32 {
     fn from(cid: ClusterId) -> Self {
         cid.0

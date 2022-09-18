@@ -3,7 +3,7 @@ use log::{debug, info};
 use crate::cache::CachedPartition;
 use crate::{fat_reader, ArcMutex, BlockDevice, ClusterId, Result, SectorId};
 
-pub fn cluster_to_sector(
+pub(crate) fn cluster_to_sector(
     cluster: ClusterId,
     sectors_per_cluster: u32,
     data_start_sector: SectorId,
@@ -115,13 +115,12 @@ impl ClusterReader {
 /// this implements and encapsulates the logic needed to traverse
 /// cluster chains, by reading the FAT table.
 #[derive(Clone)]
-pub struct ClusterChainReader {
+pub(crate) struct ClusterChainReader {
     pub device: ArcMutex<CachedPartition>,
     pub sector_size: usize,
     pub sectors_per_cluster: u32,
     pub data_start_sector: SectorId,
     pub current_cluster: Option<ClusterId>,
-    fat_start_sector: SectorId,
     cluster_reader: ClusterReader,
     pub(crate) last_cluster_read: ClusterId,
 }
@@ -132,7 +131,6 @@ impl ClusterChainReader {
         sectors_per_cluster: u32,
         cluster_to_read: ClusterId,
         data_start_sector: SectorId,
-        fat_start_sector: SectorId,
     ) -> Self {
         let current_sector =
             cluster_to_sector(cluster_to_read, sectors_per_cluster, data_start_sector);
@@ -149,7 +147,6 @@ impl ClusterChainReader {
             data_start_sector,
             current_cluster: Some(cluster_to_read),
             cluster_reader,
-            fat_start_sector,
             device,
             last_cluster_read: cluster_to_read,
         }
@@ -158,12 +155,7 @@ impl ClusterChainReader {
         if self.current_cluster.is_none() {
             return Ok(None);
         }
-        fat_reader::next_cluster(
-            self.current_cluster.unwrap(),
-            self.sector_size,
-            self.device.clone(),
-            self.fat_start_sector,
-        )
+        fat_reader::next_cluster(self.current_cluster.unwrap(), self.device.clone())
     }
 
     /// Assumptions: offset less then this object's size.

@@ -82,7 +82,7 @@ impl RegularDirectoryEntry {
     pub fn is_dir(&self) -> bool {
         self.attributes.is_directory()
     }
-    pub fn cluster(&self) -> ClusterId {
+    pub(crate) fn cluster(&self) -> ClusterId {
         ClusterId::from_high_low(self.high_16bits, self.low_16bits)
     }
     pub fn is_volume_id(&self) -> bool {

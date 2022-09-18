@@ -1,18 +1,14 @@
 use binrw::io::{SeekFrom, Write};
 use chrono::{DateTime, Datelike, Local};
 use std::fs::OpenOptions;
-use std::sync::Arc;
 
 use log::info;
 use rand::Rng;
 use serial_test::serial;
-use spin::mutex::SpinMutex;
 
-use block_devs::{ArrayBackedBlockDevice, FilebackedBlockDevice};
+use block_devs::FilebackedBlockDevice;
 use vfat_rs::mbr::MasterBootRecord;
-use vfat_rs::{
-    mbr, BlockDevice, CachedPartition, ClusterId, EntryType, Path, RawFatEntry, SectorId, VfatFS,
-};
+use vfat_rs::{mbr, BlockDevice, EntryType, Path, SectorId, VfatFS};
 
 mod block_devs;
 mod common;
@@ -210,40 +206,6 @@ fn test_get_root() -> vfat_rs::Result<()> {
     assert_eq!(entry.metadata.path(), "/");
     info!("Entry:{:?}", entry);
     Ok(())
-}
-
-#[test]
-#[serial]
-fn test_find_next_free() {
-    init();
-    let mut ret = Vec::new();
-    const RAW_ENTRY_SIZE: usize = core::mem::size_of::<RawFatEntry>();
-    // Reserved entry:
-    ret.extend_from_slice(&[0x01; RAW_ENTRY_SIZE]);
-    // Free entry:
-    ret.extend_from_slice(&[0x00; RAW_ENTRY_SIZE]);
-
-    // Complete the sector:
-    ret.extend_from_slice(&[0x01; 512 - (RAW_ENTRY_SIZE * 2)]);
-
-    let dev = ArrayBackedBlockDevice {
-        arr: ret,
-        read_iteration: 0,
-    };
-    let vfat = VfatFS {
-        device: Arc::new(SpinMutex::new(CachedPartition::new(dev))),
-        fat_start_sector: SectorId(0),
-        data_start_sector: SectorId(2),
-        sectors_per_cluster: 1,
-        sectors_per_fat: 1,
-        root_cluster: ClusterId::new(0),
-        eoc_marker: Default::default(),
-        sector_size: 1,
-    };
-    assert_eq!(
-        vfat.find_free_cluster().unwrap().unwrap(),
-        ClusterId::new(1)
-    );
 }
 
 #[test]

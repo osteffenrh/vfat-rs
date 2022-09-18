@@ -1,6 +1,7 @@
 use alloc::string::String;
 use snafu::prelude::*;
 
+/// VfatRS result type
 pub type Result<T> = core::result::Result<T, VfatRsError>;
 
 #[derive(Debug, Snafu)]

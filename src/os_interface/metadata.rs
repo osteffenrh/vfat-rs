@@ -24,7 +24,7 @@ pub struct VfatMetadata {
 }
 
 impl VfatMetadata {
-    pub fn new<S: AsRef<str>>(
+    pub(crate) fn new<S: AsRef<str>>(
         creation: VfatTimestamp,
         last_update: VfatTimestamp,
         //last_access: VfatTimestamp,
