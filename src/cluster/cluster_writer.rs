@@ -62,7 +62,7 @@ impl ClusterWriter {
             let space_left_in_current_sector =
                 self.sector_size - self.offset_byte_in_current_sector;
             let mut dev_lock = self.device.as_ref().lock();
-            let amount_written = (*dev_lock).write_sector_offset(
+            let amount_written = dev_lock.write_sector_offset(
                 self.current_sector,
                 self.offset_byte_in_current_sector,
                 &buf[total_written
@@ -92,7 +92,7 @@ impl ClusterWriter {
 
     fn _flush(&mut self) -> core::result::Result<(), binrw::io::Error> {
         let mut dev_lock = self.device.lock();
-        Ok((*dev_lock).flush()?)
+        Ok(dev_lock.flush()?)
     }
 }
 
@@ -243,6 +243,6 @@ impl ClusterChainWriter {
 
     fn _flush(&mut self) -> Result<()> {
         let mut dev_lock = self.vfat_filesystem.device.as_ref().lock();
-        (*dev_lock).flush()
+        dev_lock.flush()
     }
 }

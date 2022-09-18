@@ -135,7 +135,7 @@ impl VfatFS {
             let mut buf = [0; BUF_SIZE];
             info!("reading sector: {}/{}", i, self.sectors_per_fat);
             let mut device = self.device.lock();
-            (*device)
+            device
                 .read_sector(SectorId(self.fat_start_sector + i), &mut buf)
                 .unwrap();
             let mut fat_entries: [FatEntry; ENTRIES_BUF_SIZE] =

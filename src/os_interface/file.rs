@@ -97,7 +97,7 @@ impl VfatFile {
 
     pub fn flush(&mut self) -> Result<()> {
         let mut dev_lock = self.vfat_filesystem.device.as_ref().lock();
-        (*dev_lock).flush()
+        dev_lock.flush()
     }
 
     pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {

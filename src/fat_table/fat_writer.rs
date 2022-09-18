@@ -17,7 +17,7 @@ pub(crate) fn delete_cluster_chain(
     }
 
     let mut dev_lock = device.lock();
-    (*dev_lock).set_fat_entry(current, DELETED_ENTRY)?;
+    dev_lock.set_fat_entry(current, DELETED_ENTRY)?;
 
     Ok(())
 }

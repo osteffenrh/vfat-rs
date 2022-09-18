@@ -80,7 +80,7 @@ impl ClusterReader {
             let space_left_in_current_sector =
                 self.sector_size - self.offset_byte_in_current_sector;
             let mut dev_lock = self.device.lock();
-            let amount_read = (*dev_lock).read_sector_offset(
+            let amount_read = dev_lock.read_sector_offset(
                 self.current_sector,
                 self.offset_byte_in_current_sector,
                 &mut buf[total_amount_read..core::cmp::min(buf_len, space_left_in_current_sector)],
