@@ -6,16 +6,16 @@ use core::mem;
 use log::{debug, error, info};
 use snafu::ensure;
 
-use crate::cluster_reader::ClusterChainReader;
-use crate::cluster_writer::ClusterChainWriter;
-use crate::error;
-use crate::formats::timestamp::VfatTimestamp;
+use crate::cluster::cluster_reader::ClusterChainReader;
+use crate::cluster::cluster_writer::ClusterChainWriter;
 use crate::os_interface::directory_entry::{
     unknown_entry_convert_to_bytes_2, Attributes, EntryId, RegularDirectoryEntry,
     UnknownDirectoryEntry, VfatDirectoryEntry,
 };
+use crate::os_interface::timestamp::VfatTimestamp;
 use crate::os_interface::{VfatEntry, VfatMetadata};
-use crate::{cluster_writer, ClusterId, SectorId, VfatFS, VfatMetadataTrait};
+use crate::{error, Path};
+use crate::{ClusterId, SectorId, VfatFS, VfatMetadataTrait};
 
 // TODO: this assumes sector size
 const SECTOR_SIZE: usize = 512;
@@ -32,47 +32,6 @@ pub enum EntryType {
     File,
     Directory,
     // Link
-}
-
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone)]
-pub struct Path(pub String);
-
-impl Path {
-    pub fn new<S: AsRef<str>>(path: S) -> Self {
-        Self(String::from(path.as_ref()))
-    }
-    pub fn as_parts(&self) -> impl Iterator<Item = &str> {
-        self.0.split_terminator('/')
-    }
-    pub fn to_str(&self) -> &str {
-        self.0.as_str()
-    }
-}
-impl core::fmt::Display for Path {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-impl PartialEq<String> for &Path {
-    fn eq(&self, other: &String) -> bool {
-        other.as_str() == self.0.as_str()
-    }
-}
-impl PartialEq<&str> for &Path {
-    fn eq(&self, other: &&str) -> bool {
-        *other == self.0.as_str()
-    }
-}
-
-impl From<&str> for Path {
-    fn from(s: &str) -> Self {
-        Self::new(s)
-    }
-}
-impl From<String> for Path {
-    fn from(s: String) -> Self {
-        Self::new(s)
-    }
 }
 
 /// This is the public interface to the directory concept.
@@ -133,6 +92,7 @@ impl VfatDirectory {
         if self.contains(&name)? {
             return Err(error::VfatRsError::NameAlreadyInUse { target: name });
         }
+
         //1. Create metadata:
         let metadata = self.create_metadata_for_new_entry(name.as_str(), &entry_type)?;
 
@@ -181,7 +141,7 @@ impl VfatDirectory {
 
         let sector_offset = (spot_memory_offset / self.vfat_filesystem.sector_size) as u32;
 
-        let mut ccw = cluster_writer::ClusterChainWriter::new_w_offset(
+        let mut ccw = ClusterChainWriter::new_w_offset(
             self.vfat_filesystem.clone(),
             cluster_id,
             SectorId(sector_offset),
@@ -263,25 +223,19 @@ impl VfatDirectory {
             .cluster_chain_reader(self.metadata.cluster);
 
         let mut entries = Vec::new();
-
-        loop {
-            if 0 == cluster_chain_reader.read(&mut buf)? {
-                break;
-            }
+        while cluster_chain_reader.read(&mut buf)? > 0 {
             let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
                 unknown_entry_convert_from_bytes_entries(buf);
             debug!("Unknown entries: {:?}", unknown_entries);
             #[cfg(debug_assertions)]
             unknown_entries
                 .iter()
-                .map(Clone::clone)
                 .map(VfatDirectoryEntry::from)
                 //.take_while(filter_invalid)
                 .for_each(|entry| info!("unknown entry to vfat directory entry: {:?}", entry));
 
             unknown_entries
                 .iter()
-                .map(Clone::clone)
                 .map(VfatDirectoryEntry::from)
                 .filter(filter_invalid)
                 .for_each(|entry| {

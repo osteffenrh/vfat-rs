@@ -20,7 +20,7 @@ mod common;
    Vfat's integration tests. Why the serial annotation? Because each test is creating a new instance
    of VFAT, so they are not synchronized underneath (something that should not happen in the kernel were
    one is supposed to have one instance per device). Because wrapping the VFAT instance into a mutex
-   would end up to just have them running in serial, I prefered to just go ahead and use `serial_test` crate.
+   would end up to just have them running in serial, I preferred to just go ahead and use `serial_test` crate.
 */
 fn init() -> (FilebackedBlockDevice, MasterBootRecord) {
     std::env::set_var("RUST_LOG", "debug");

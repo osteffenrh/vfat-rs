@@ -1,16 +1,12 @@
-### VFAT / FAT32
+# VFAT / FAT32
+A simple VFAT implementation written in rust, and mostly tested against Linux's vfat driver.
+
+## no_std
+This component was first developed with no_std in mind. `std` is still not yet supported but coming soon.
+
+
+## More info:
 * Exfat specification: https://docs.microsoft.com/en-us/windows/win32/fileio/exfat-specification#1-introduction
-
-
-## Limitations
-From: https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#Size_limits
-Depending on how the FAT is constructed:
-* 1 sector on each copy of FAT for every 128 clusters
-* FAT32 range : 65,525 to 268,435,444 clusters : 512 to 2,097,152 sectors per copy of FAT
-* FAT32 minimum : 1 sector per cluster × 65,525 clusters = 33,548,800 bytes (32,762.5 KB)
-* FAT32 maximum : 8 sectors per cluster × 268,435,444 clusters = 1,099,511,578,624 bytes (≈1,024 GB)
-* FAT32 maximum : 16 sectors per cluster × 268,173,557 clusters = 2,196,877,778,944 bytes (≈2,046 GB)
-
 
 ## Testing
 All tests runs on same filesystem, and test shall not happen in parallel (for now!).
@@ -60,9 +56,9 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
 * Free cluster summary update when allocating clusters.
 
 ### Future improvements.
-* Currently the mutex is shared behind an ARC reference. Maybe, having the whole FS behind arc would save quite some space when
-  returning files and directories.
-* Get rid of alloc dependency?
+* Currently the device mutex is shared behind an ARC reference. Maybe, also having the whole FS behind arc would save quite some space when
+  returning files and directories. Because they get a copy of the Vfat struct.
+* Get rid of alloc dependency? -> only used for String support rn.
 
 ### FAQ
 * What happens if I have a "File" handle and meanwhile someone deletes this file and

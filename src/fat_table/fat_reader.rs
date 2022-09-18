@@ -4,7 +4,7 @@ use log::info;
 
 use crate::device::BlockDevice;
 use crate::error::Result;
-use crate::utils::get_params;
+use crate::fat_table::get_params;
 use crate::{ArcMutex, RawFatEntry, SectorId};
 use crate::{CachedPartition, ClusterId, FatEntry};
 

@@ -1,5 +1,4 @@
 use alloc::string::String;
-use binrw::io::ErrorKind;
 use snafu::prelude::*;
 
 pub type Result<T> = core::result::Result<T, VfatRsError>;
@@ -15,7 +14,7 @@ pub enum VfatRsError {
     FreeClusterNotFound,
     #[snafu(display("Checked mult failed."))]
     CheckedMulFailed,
-    #[snafu(display("A file named '{}' already exists.", target))]
+    #[snafu(display("An entry (file/directory) named '{}' already exists.", target))]
     NameAlreadyInUse { target: String },
     #[snafu(display("BinRW Error: {}", source))]
     BinRwError { source: BinRwErrorWrapper },
@@ -31,15 +30,11 @@ pub enum VfatRsError {
     CannotDeletePseudoDir { target: String },
 }
 
+// Needed because BinRw doesn't have the Snafu impl.
 #[derive(Debug, Snafu)]
 #[snafu(display("{value}"))]
 pub struct BinRwErrorWrapper {
     pub(crate) value: binrw::error::Error,
-}
-impl From<binrw::error::Error> for BinRwErrorWrapper {
-    fn from(value: binrw::Error) -> Self {
-        Self { value }
-    }
 }
 impl From<binrw::error::Error> for VfatRsError {
     fn from(err: binrw::Error) -> Self {
@@ -53,8 +48,8 @@ impl From<binrw::io::Error> for VfatRsError {
         VfatRsError::from(binrw::Error::from(value))
     }
 }
-impl From<ErrorKind> for VfatRsError {
-    fn from(value: ErrorKind) -> Self {
+impl From<binrw::io::ErrorKind> for VfatRsError {
+    fn from(value: binrw::io::ErrorKind) -> Self {
         VfatRsError::from(binrw::io::Error::from(value))
     }
 }
@@ -69,6 +64,6 @@ pub enum MbrError {
 impl From<VfatRsError> for binrw::io::Error {
     fn from(_err: VfatRsError) -> Self {
         // TODO: provide useful output
-        ErrorKind::Other.into()
+        binrw::io::ErrorKind::Other.into()
     }
 }

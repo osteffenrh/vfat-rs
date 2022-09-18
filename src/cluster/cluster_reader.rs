@@ -113,7 +113,7 @@ impl ClusterReader {
 }
 
 /// this implements and encapsulates the logic needed to traverse
-/// cluster chains.
+/// cluster chains, by reading the FAT table.
 #[derive(Clone)]
 pub struct ClusterChainReader {
     pub device: ArcMutex<CachedPartition>,

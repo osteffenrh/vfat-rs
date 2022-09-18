@@ -1,7 +1,8 @@
-use crate::formats::timestamp::VfatTimestamp;
+use crate::os_interface::timestamp::VfatTimestamp;
 use crate::os_interface::{VfatDirectory, VfatFile, VfatMetadata};
 use crate::{Result, VfatFS};
 
+/// This is a library's user interface. Each directory can contain either a File or a Directory.
 #[derive(Debug)]
 enum EntryKind {
     File,

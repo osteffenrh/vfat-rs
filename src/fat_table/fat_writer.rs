@@ -1,7 +1,7 @@
 use log::info;
 
 use crate::error::Result;
-use crate::utils::get_params;
+use crate::fat_table::get_params;
 use crate::{ArcMutex, BlockDevice, CachedPartition, ClusterId, FatEntry, SectorId};
 
 pub fn set_fat_entry(

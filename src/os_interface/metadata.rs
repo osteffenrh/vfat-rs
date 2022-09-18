@@ -1,9 +1,10 @@
-use crate::formats::timestamp::VfatTimestamp;
 use crate::os_interface::directory_entry::Attributes;
-use crate::os_interface::Path;
+use crate::os_interface::timestamp::VfatTimestamp;
 use crate::ClusterId;
+use crate::Path;
 use alloc::string::String;
 
+/// Metadatas are common to every entry type.
 #[derive(Debug, Clone)]
 pub struct VfatMetadata {
     creation: VfatTimestamp,

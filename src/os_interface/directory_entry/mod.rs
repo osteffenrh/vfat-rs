@@ -3,125 +3,34 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cmp::min;
 use core::convert::TryInto;
-use core::fmt::{Debug, Formatter};
-use core::{fmt, iter};
+use core::fmt::Debug;
+use core::iter;
 
 use log::{debug, info};
 use regex::Regex;
 
-use crate::formats::timestamp::VfatTimestamp;
+pub use crate::os_interface::directory_entry::formats::{attribute, Attributes, EntryId};
 use crate::os_interface::directory_entry::long_file_name_entry::{
     LongFileNameEntry, SequenceNumber,
 };
 pub use crate::os_interface::directory_entry::regular_entry::RegularDirectoryEntry;
 pub use crate::os_interface::directory_entry::unknown_entry::*;
-use crate::{const_assert_size, ClusterId};
+use crate::os_interface::timestamp::VfatTimestamp;
+use crate::ClusterId;
 
+mod formats;
 mod long_file_name_entry;
 mod regular_entry;
 mod unknown_entry;
 
 const ID_LAST_ENTRY_WAS_LAST: u8 = 0x00;
 const ID_DELETED_UNUSED_ENTRY: u8 = 0xE5;
-/// The first byte of an entry is called ID.
-pub enum EntryId {
-    Deleted,
-    EndOfEntries,
-    Valid(u8),
-}
-impl From<u8> for EntryId {
-    fn from(id: u8) -> Self {
-        match id {
-            ID_LAST_ENTRY_WAS_LAST => Self::EndOfEntries,
-            ID_DELETED_UNUSED_ENTRY => Self::Deleted,
-            _ => Self::Valid(id),
-        }
-    }
-}
 
-impl From<EntryId> for u8 {
-    fn from(entry_id: EntryId) -> Self {
-        match entry_id {
-            EntryId::EndOfEntries => ID_LAST_ENTRY_WAS_LAST,
-            EntryId::Deleted => ID_DELETED_UNUSED_ENTRY,
-            EntryId::Valid(id) => id,
-        }
-    }
-}
-
-mod attribute {
-    pub(crate) const READ_ONLY: u8 = 0x01;
-    pub(crate) const HIDDEN: u8 = 0x02;
-    pub(crate) const SYSTEM: u8 = 0x04;
-    pub(crate) const VOLUME_ID: u8 = 0x08;
-    pub(crate) const DIRECTORY: u8 = 0x10;
-    pub(crate) const ARCHIVE: u8 = 0x20;
-    pub(crate) const LFN: u8 = READ_ONLY | HIDDEN | SYSTEM | VOLUME_ID;
-}
-
-#[derive(Copy, Clone)]
-#[repr(transparent)]
-pub struct Attributes(pub u8);
-impl Attributes {
-    pub fn new_directory() -> Self {
-        Self(attribute::DIRECTORY)
-    }
-    fn matches(&self, attribute: u8) -> bool {
-        self.0 & attribute == attribute
-    }
-    pub fn is_lfn(&self) -> bool {
-        self.matches(attribute::LFN)
-    }
-    pub fn is_read_only(&self) -> bool {
-        self.matches(attribute::READ_ONLY)
-    }
-    pub fn is_hidden(&self) -> bool {
-        self.matches(attribute::HIDDEN)
-    }
-    pub fn is_system(&self) -> bool {
-        self.matches(attribute::SYSTEM)
-    }
-    pub fn is_volume_id(&self) -> bool {
-        self.matches(attribute::VOLUME_ID)
-    }
-    pub fn is_directory(&self) -> bool {
-        self.matches(attribute::DIRECTORY)
-    }
-    pub fn is_archive(&self) -> bool {
-        self.matches(attribute::ARCHIVE)
-    }
-}
-impl Debug for Attributes {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Attributes(")?;
-        if self.is_lfn() {
-            // if is a longfilename, no need to print other fields.
-            return write!(f, "LFN)");
-        }
-        if self.is_read_only() {
-            write!(f, "READ_ONLY, ")?;
-        }
-        if self.is_hidden() {
-            write!(f, "HIDDEN, ")?;
-        }
-        if self.is_system() {
-            write!(f, "SYSTEM, ")?;
-        }
-        if self.is_volume_id() {
-            write!(f, "VOLUME_ID")?;
-        }
-        if self.is_directory() {
-            write!(f, "DIRECTORY, ")?;
-        }
-        if self.is_archive() {
-            write!(f, "ARCHIVE, ")?;
-        }
-        write!(f, ")")
-    }
-}
-
-const_assert_size!(Attributes, 1);
-
+/// The content of a directory on a disk, is a list of entries which can take form of:
+///  * A regular entry
+///  * A lfn entry.
+///  * an EOE - last entry in the chain to signal the end of the directory contents.
+/// * a Deleted entry, which might be reused for new entries.
 #[derive(Clone, Debug)]
 pub enum VfatDirectoryEntry {
     Regular(RegularDirectoryEntry),
@@ -158,6 +67,7 @@ const PADDING_CHARACTER: u8 = b' ';
 const DOT_CHARACTER: u8 = b'.';
 
 impl VfatDirectoryEntry {
+    // pseudo dir entries are entries . and ..
     pub fn create_pseudo_dir_entries(
         current_dir: ClusterId,
         parent_dir: ClusterId,
@@ -166,20 +76,20 @@ impl VfatDirectoryEntry {
         let current_name = [DOT_CHARACTER, 0, 0, 0, 0, 0, 0, 0];
         let file_ext = [PADDING_CHARACTER; 3];
         let attributes = Attributes::new_directory();
-
-        let current_entry = RegularDirectoryEntry {
-            file_name: current_name,
+        let new_regular_dir_entry = |name, high, low| RegularDirectoryEntry {
+            file_name: name,
             file_ext,
             attributes,
             _reseverd_win_nt: 0,
             creation_millis: Default::default(),
             creation_time: VfatTimestamp::new(1385663476),
             last_access_date: 0,
-            high_16bits: current_high,
+            high_16bits: high,
             last_modification_time: VfatTimestamp::new(1385663476),
-            low_16bits: current_low,
+            low_16bits: low,
             file_size: 0,
         };
+        let current_entry = new_regular_dir_entry(current_name, current_high, current_low);
 
         let parent_name = [DOT_CHARACTER, DOT_CHARACTER, 0, 0, 0, 0, 0, 0];
 
@@ -194,20 +104,7 @@ impl VfatDirectoryEntry {
         }
         .into_high_low();
 
-        let parent_entry = RegularDirectoryEntry {
-            file_name: parent_name,
-            file_ext,
-            attributes,
-            _reseverd_win_nt: 0,
-            creation_millis: Default::default(),
-            creation_time: VfatTimestamp::new(1385663476),
-            last_access_date: 0,
-            high_16bits: parent_high,
-            last_modification_time: VfatTimestamp::new(1385663476),
-            low_16bits: parent_low,
-            file_size: 0,
-        };
-
+        let parent_entry = new_regular_dir_entry(parent_name, parent_high, parent_low);
         [
             VfatDirectoryEntry::Regular(current_entry).transmute_into_unknown_dir_entry(),
             VfatDirectoryEntry::Regular(parent_entry).transmute_into_unknown_dir_entry(),
@@ -440,8 +337,9 @@ impl<const T: usize> ToUtf16<T> for &str {
 mod test {
     extern crate std;
 
+    use crate::os_interface::directory_entry::formats::Attributes;
     use crate::os_interface::directory_entry::{
-        Attributes, LongFileNameEntry, RegularDirectoryEntry, VfatDirectoryEntry,
+        LongFileNameEntry, RegularDirectoryEntry, VfatDirectoryEntry,
     };
     use crate::ClusterId;
 
