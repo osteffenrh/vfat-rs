@@ -9,8 +9,6 @@ pub type Result<T> = core::result::Result<T, VfatRsError>;
 pub enum VfatRsError {
     #[snafu(display("MBR Error: {error}"))]
     Mbr { error: MbrError },
-    #[snafu(display("TODO"))]
-    MyWhatever,
     #[snafu(display("Free cluster not found, probably memory is full!?"))]
     FreeClusterNotFound,
     #[snafu(display("Checked mult failed."))]
