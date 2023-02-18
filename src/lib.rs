@@ -27,7 +27,7 @@ use os_interface::directory_entry::{
     Attributes, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
 };
 pub use os_interface::EntryType;
-pub use os_interface::{VfatDirectory, VfatEntry, VfatMetadata, VfatMetadataTrait};
+pub use os_interface::{Directory, Metadata, VfatEntry, VfatMetadataTrait};
 pub use vfat::VfatFS;
 
 mod cache;

@@ -223,25 +223,26 @@ fn test_file_write_long() -> vfat_rs::Result<()> {
 #[test]
 #[serial]
 fn test_file_creation() -> vfat_rs::Result<()> {
-    let invalid_name = "hello+world";
+    let file_name = "hello_world";
     let used_name_path = "/hello_world";
 
     let mut vfat = init_vfat()?;
     let mut root = vfat.get_root()?;
 
     // 2. assert file does not exists
-    vfat.path_exists(used_name_path.into())
-        .expect("File already exists. Please delete it.");
+    assert!(
+        !vfat.path_exists(used_name_path.into())?,
+        "File already exists"
+    );
 
     // 3. create file
-    root.create(invalid_name.into(), EntryType::File)
+    root.create_file(file_name.into())
         .expect("Cannote create file");
 
-    vfat.path_exists(used_name_path.into()).unwrap();
+    assert!(vfat.path_exists(used_name_path.into())?);
 
     // 4. try to create another file with the same name should fail.
-    root.create(invalid_name.into(), EntryType::File)
-        .unwrap_err();
+    root.create_file(file_name.into()).unwrap_err();
 
     Ok(())
 }
@@ -343,13 +344,12 @@ fn test_big_write_and_read() -> vfat_rs::Result<()> {
         .expect("File already exists. Please delete it.");
 
     // 3. create file
-    let res = root
-        .create(file_name.clone(), EntryType::File)
+    let mut as_file = root
+        .create_file(file_name.clone())
         .expect("Cannote create file");
 
     // 4. Write CONTENT to file
     const CONTENT: &[u8] = b"Hello, world! This is Vfat\n";
-    let mut as_file = res.into_file().expect("Into file");
     for _ in 0..ITERATIONS {
         as_file.write_all(CONTENT).expect("write all");
     }
@@ -406,12 +406,10 @@ fn test_create_directory(prefix: &str) -> vfat_rs::Result<()> {
         .expect_err(err.as_str());
 
     // 3. create directory
-    let res = root.create(dir_name.clone(), EntryType::Directory)?;
+    let mut res = root.create_directory(dir_name.clone())?;
 
     let sub_dir = "prova";
-    res.into_directory()
-        .unwrap()
-        .create(sub_dir.to_string(), EntryType::Directory)?;
+    res.create_directory(sub_dir.to_string())?;
     let full_path = format!("/{}/{}", dir_name, sub_dir);
     vfat.get_path(Path::new(full_path))?;
 
@@ -429,12 +427,9 @@ fn test_delete_folder_non_empty() -> vfat_rs::Result<()> {
     let (folder_name, _folder_path) = random_name("delfld");
     let mut vfat = init_vfat()?;
     let mut root = vfat.get_root()?;
-    let mut folder = root
-        .create(folder_name.clone(), EntryType::Directory)?
-        .into_directory()
-        .unwrap();
+    let mut folder = root.create_directory(folder_name.clone())?;
     let (subfolder_name, _subfolder_path) = random_name("subfld");
-    folder.create(subfolder_name.clone(), EntryType::Directory)?;
+    folder.create_directory(subfolder_name.clone())?;
     // cannot delete folder with some content:
     root.delete(folder_name.to_string()).unwrap_err();
 

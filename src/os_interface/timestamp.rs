@@ -2,9 +2,7 @@ use crate::defbit;
 
 /// Tenths of a second. Range 0-199 inclusive,
 /// as represented in FAT32 on-disk structures.
-#[repr(transparent)]
-#[derive(Default, Copy, Clone)]
-pub struct Milliseconds(u8);
+pub type Milliseconds = u8;
 
 defbit!(
     VfatTimestamp,

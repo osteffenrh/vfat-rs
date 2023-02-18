@@ -4,6 +4,11 @@ A simple VFAT implementation written in rust, and mostly tested against Linux's 
 ## no_std
 This component was first developed with no_std in mind. `std` is still not yet supported but coming soon.
 
+## Run example
+to run the example, first create a vfat fs using tests/setup.sh, then run the example file using:
+```bash
+cargo run --example simple
+```
 
 ## More info:
 * Exfat specification: https://docs.microsoft.com/en-us/windows/win32/fileio/exfat-specification#1-introduction
@@ -56,7 +61,7 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
 * Free cluster summary update when allocating clusters.
 
 ### Future improvements.
-* Currently the device mutex is shared behind an ARC reference. Maybe, also having the whole FS behind arc would save quite some space when
+* Currently, the device mutex is shared behind an ARC reference. Maybe, also having the whole FS behind arc would save quite some space when
   returning files and directories. Because they get a copy of the Vfat struct.
 * Get rid of alloc dependency? -> only used for String support rn.
 

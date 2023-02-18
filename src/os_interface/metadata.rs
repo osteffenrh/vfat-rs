@@ -6,7 +6,7 @@ use alloc::string::String;
 
 /// Metadatas are common to every entry type.
 #[derive(Debug, Clone)]
-pub struct VfatMetadata {
+pub struct Metadata {
     creation: VfatTimestamp,
     last_update: VfatTimestamp,
     //last_access: VfatTimestamp,
@@ -23,7 +23,7 @@ pub struct VfatMetadata {
     pub(crate) attributes: Attributes,
 }
 
-impl VfatMetadata {
+impl Metadata {
     pub(crate) fn new<S: AsRef<str>>(
         creation: VfatTimestamp,
         last_update: VfatTimestamp,
@@ -48,7 +48,7 @@ impl VfatMetadata {
         }
     }
 }
-impl VfatMetadata {
+impl Metadata {
     pub fn size(&self) -> usize {
         self.size as usize
     }

@@ -1,7 +1,7 @@
 use crate::{
     fat_reader, fat_writer, ArcMutex, Attributes, BlockDevice, CachedPartition, ClusterId,
-    FatEntry, RegularDirectoryEntry, SectorId, UnknownDirectoryEntry, VfatDirectory,
-    VfatDirectoryEntry, VfatEntry, VfatMetadata, VfatRsError, EBPF_VFAT_MAGIC, EBPF_VFAT_MAGIC_ALT,
+    Directory, FatEntry, Metadata, RegularDirectoryEntry, SectorId, UnknownDirectoryEntry,
+    VfatDirectoryEntry, VfatEntry, VfatRsError, EBPF_VFAT_MAGIC, EBPF_VFAT_MAGIC_ALT,
 };
 
 use crate::cluster::{cluster_reader, cluster_writer};
@@ -268,7 +268,7 @@ impl VfatFS {
             x => x,
         }
     }
-    pub fn get_root(&mut self) -> Result<VfatDirectory> {
+    pub fn get_root(&mut self) -> Result<Directory> {
         const UNKNOWN_ENTRIES: usize = 1;
         const BUF_SIZE: usize = UNKNOWN_ENTRIES * mem::size_of::<UnknownDirectoryEntry>();
         let mut buf = [0; BUF_SIZE];
@@ -283,7 +283,7 @@ impl VfatFS {
                 binrw::io::Error::new(binrw::io::ErrorKind::NotFound, "Volume id not found?!")
             })?;
 
-        let metadata = VfatMetadata::new(
+        let metadata = Metadata::new(
             volume_id.creation_time,
             volume_id.last_modification_time,
             "/",
@@ -293,7 +293,7 @@ impl VfatFS {
             Path::new(""),
             Attributes::new_directory(),
         );
-        Ok(VfatDirectory::new(self.clone(), metadata))
+        Ok(Directory::new(self.clone(), metadata))
     }
 }
 

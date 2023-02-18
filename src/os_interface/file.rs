@@ -4,18 +4,18 @@ use core::{cmp, fmt};
 
 use log::{debug, info};
 
-use crate::os_interface::VfatMetadata;
+use crate::os_interface::Metadata;
 use crate::{error, ClusterId, Result, VfatFS};
 
 /// A File representation in a VfatFilesystem.
 //#[derive(Clone)]
-pub struct VfatFile {
+pub struct File {
     pub(crate) vfat_filesystem: VfatFS,
-    pub(crate) metadata: VfatMetadata,
+    pub(crate) metadata: Metadata,
     // Current Seek position
     pub offset: usize,
 }
-impl fmt::Debug for VfatFile {
+impl fmt::Debug for File {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -25,15 +25,15 @@ impl fmt::Debug for VfatFile {
     }
 }
 
-impl VfatFile {
-    pub fn new(vfat_filesystem: VfatFS, metadata: VfatMetadata) -> Self {
-        VfatFile {
+impl File {
+    pub fn new(vfat_filesystem: VfatFS, metadata: Metadata) -> Self {
+        File {
             vfat_filesystem,
             metadata,
             offset: 0,
         }
     }
-    pub fn metadata(&self) -> &VfatMetadata {
+    pub fn metadata(&self) -> &Metadata {
         &self.metadata
     }
 
@@ -166,7 +166,7 @@ impl VfatFile {
     }
 }
 
-impl Write for VfatFile {
+impl Write for File {
     fn write(&mut self, buf: &[u8]) -> binrw::io::Result<usize> {
         Ok(self.write(buf)?)
     }

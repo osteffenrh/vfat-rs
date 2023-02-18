@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+## Creates a new vfat fs on a file.
+## creates mbr, mounts the fs, write files and directory and umount it.
+
 set -e
 # FS size in megabytes:
 fs_size=260
@@ -17,7 +20,7 @@ echo "setup.sh: going to create an fs in ${temp_dir}${diskimg}";
 
 # From: https://unix.stackexchange.com/a/527217/61495
 # Filename of resulting disk image
-if [ -d "$temp_dir"] ; then
+if [ -d "$temp_dir" ] ; then
   rm -rf $temp_dir
 fi
 
@@ -81,3 +84,5 @@ cd /tmp
 
 ## Then unmount the fs, to flush disk writes.
 exec sudo umount $dest
+
+echo "created fs: ${temp_dir}${diskimg}"

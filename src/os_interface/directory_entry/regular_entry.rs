@@ -5,7 +5,7 @@ use core::fmt::{Debug, Formatter};
 
 use crate::os_interface::directory_entry::{Attributes, VfatDirectoryEntry};
 use crate::os_interface::timestamp::{Milliseconds, VfatTimestamp};
-use crate::os_interface::VfatMetadata;
+use crate::os_interface::Metadata;
 use crate::{const_assert_size, ClusterId};
 
 #[derive(Copy, Clone)]
@@ -57,8 +57,8 @@ impl Debug for RegularDirectoryEntry {
     }
 }
 
-impl From<VfatMetadata> for RegularDirectoryEntry {
-    fn from(metadata: VfatMetadata) -> Self {
+impl From<Metadata> for RegularDirectoryEntry {
+    fn from(metadata: Metadata) -> Self {
         let file_name = VfatDirectoryEntry::regular_filename_from(metadata.name());
         let file_ext = VfatDirectoryEntry::get_regular_filename_ext(metadata.name());
         let (high_16bits, low_16bits) = metadata.cluster.into_high_low();

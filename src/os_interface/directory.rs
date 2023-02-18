@@ -13,7 +13,7 @@ use crate::os_interface::directory_entry::{
     UnknownDirectoryEntry, VfatDirectoryEntry,
 };
 use crate::os_interface::timestamp::VfatTimestamp;
-use crate::os_interface::{VfatEntry, VfatMetadata};
+use crate::os_interface::{File, Metadata, VfatEntry};
 use crate::{error, Path};
 use crate::{ClusterId, SectorId, VfatFS, VfatMetadataTrait};
 
@@ -36,13 +36,13 @@ pub enum EntryType {
 
 /// This is the public interface to the directory concept.
 #[derive(Debug)]
-pub struct VfatDirectory {
+pub struct Directory {
     pub(crate) vfat_filesystem: VfatFS,
-    pub metadata: VfatMetadata,
+    pub metadata: Metadata,
 }
 
-impl VfatDirectory {
-    pub fn new(vfat_filesystem: VfatFS, metadata: VfatMetadata) -> Self {
+impl Directory {
+    pub fn new(vfat_filesystem: VfatFS, metadata: Metadata) -> Self {
         Self {
             vfat_filesystem,
             metadata,
@@ -53,7 +53,7 @@ impl VfatDirectory {
         &mut self,
         entry_name: &str,
         entry_type: &EntryType,
-    ) -> error::Result<VfatMetadata> {
+    ) -> error::Result<Metadata> {
         let path = Path::new(format!("{}{}", self.metadata.path(), entry_name));
         let attributes = Self::attributes_from_entry(entry_type);
         let cluster_id = match entry_type {
@@ -62,7 +62,7 @@ impl VfatDirectory {
         };
         info!("Going to use as cluster id: {}", cluster_id);
         let size = 0;
-        let metadata = VfatMetadata::new(
+        let metadata = Metadata::new(
             VfatTimestamp::new(0),
             VfatTimestamp::new(0),
             entry_name,
@@ -76,7 +76,7 @@ impl VfatDirectory {
     }
 }
 
-impl VfatDirectory {
+impl Directory {
     pub(crate) fn iter(&self) -> IntoIter<VfatEntry> {
         self.contents().unwrap().into_iter()
     }
@@ -88,6 +88,15 @@ impl VfatDirectory {
         }
         Ok(false)
     }
+    pub fn create_file(&mut self, name: String) -> error::Result<File> {
+        Ok(self.create(name, EntryType::File)?.into_file().unwrap())
+    }
+    pub fn create_directory(&mut self, name: String) -> error::Result<Directory> {
+        Ok(self
+            .create(name, EntryType::Directory)?
+            .into_directory_unchecked())
+    }
+
     pub fn create(&mut self, name: String, entry_type: EntryType) -> error::Result<VfatEntry> {
         if self.contains(&name)? {
             return Err(error::VfatRsError::NameAlreadyInUse { target: name });
@@ -211,7 +220,7 @@ impl VfatDirectory {
         self.delete_entry(target_entry)
     }
 
-    fn contents(&self) -> error::Result<Vec<VfatEntry>> {
+    pub fn contents(&self) -> error::Result<Vec<VfatEntry>> {
         info!("Directory contents, cluster: {:?}", self.metadata.cluster);
 
         let mut buf = [0; BUF_SIZE];
@@ -266,7 +275,7 @@ impl VfatDirectory {
                         regular.full_name()
                     };
 
-                    let metadata = VfatMetadata::new(
+                    let metadata = Metadata::new(
                         regular.creation_time,
                         regular.last_modification_time,
                         name.clone(),
@@ -303,7 +312,7 @@ impl VfatDirectory {
         Ok(contents)
     }
 
-    pub(crate) fn update_entry(&mut self, metadata: VfatMetadata) -> error::Result<()> {
+    pub(crate) fn update_entry(&mut self, metadata: Metadata) -> error::Result<()> {
         let target_name = metadata.name().to_string();
         info!("Running update entry on target name: {}", target_name);
         let regular: RegularDirectoryEntry = metadata.into();
@@ -311,7 +320,7 @@ impl VfatDirectory {
     }
 }
 
-impl VfatDirectory {
+impl Directory {
     fn cluster_chain_reader(&self) -> ClusterChainReader {
         self.vfat_filesystem
             .cluster_chain_reader(self.metadata.cluster)
