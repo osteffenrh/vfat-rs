@@ -1,7 +1,7 @@
 use log::{debug, info};
 
 use crate::cache::CachedPartition;
-use crate::{fat_reader, ArcMutex, BlockDevice, ClusterId, Result, SectorId};
+use crate::{fat_table, ArcMutex, BlockDevice, ClusterId, Result, SectorId};
 
 pub(crate) fn cluster_to_sector(
     cluster: ClusterId,
@@ -155,7 +155,7 @@ impl ClusterChainReader {
         if self.current_cluster.is_none() {
             return Ok(None);
         }
-        fat_reader::next_cluster(self.current_cluster.unwrap(), self.device.clone())
+        fat_table::next_cluster(self.current_cluster.unwrap(), self.device.clone())
     }
 
     /// Assumptions: offset less then this object's size.

@@ -1,14 +1,13 @@
-use crate::{const_assert_size, ClusterId};
 use core::mem;
 
-pub const FAT_ENTRY_SIZE: usize = mem::size_of::<u32>();
+use crate::ClusterId;
 
-const_assert_size!(FatEntry, 8); // TODO: why does this take 8 bytes?! O_o I would expect at most 5
+pub(crate) const FAT_ENTRY_SIZE: usize = mem::size_of::<u32>();
 
 /// A fat32 row entry. Each entry represents a cluster. This is the "high level" view
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[repr(C)]
-pub enum FatEntry {
+pub(crate) enum FatEntry {
     /// Entry 0, formatted as 0xFFFFFFFN
     #[allow(dead_code)]
     Id(u32),

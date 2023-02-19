@@ -18,8 +18,6 @@ use spin::mutex::SpinMutex;
 pub(crate) use cache::CachedPartition;
 pub use device::BlockDevice;
 pub use error::{Result, VfatRsError};
-use fat_table::fat_entry::FatEntry;
-use fat_table::{fat_reader, fat_writer};
 pub(crate) use formats::cluster_id::ClusterId;
 pub use formats::path::Path;
 pub use formats::sector_id::SectorId;

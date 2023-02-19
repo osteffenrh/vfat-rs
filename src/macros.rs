@@ -22,6 +22,9 @@ macro_rules! const_assert_eq {
 }
 
 /// A compile time size assertion. Can be used to check the actual struct size.
+/// usage:
+/// const_assert_size!(<struct or enum name>, <amount-of-expected-bytes>);
+/// const_assert_size!(FatEntry, 8);
 #[macro_export]
 macro_rules! const_assert_size {
     ($struct:ident, $size:expr) => {

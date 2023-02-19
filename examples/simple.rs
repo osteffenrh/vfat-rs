@@ -1,15 +1,17 @@
-use std::fs::{File, OpenOptions};
-use vfat_rs::mbr::MasterBootRecord;
-use vfat_rs::{BlockDevice, EntryType, SectorId, VfatFS, VfatMetadataTrait};
-
-use binrw::io::{SeekFrom, Write};
-use env_logger::Env;
-use log::debug;
 use std::cmp::min;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek};
 
+use binrw::io::{SeekFrom, Write};
+use log::debug;
+
+use vfat_rs::mbr::MasterBootRecord;
+use vfat_rs::{BlockDevice, SectorId, VfatFS, VfatMetadataTrait};
+
 fn main() {
-    //env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    // to enable logging:
+    // use env_logger::Env;
+    // env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let mut fbd = FilebackedBlockDevice {
         image: OpenOptions::new()
             .read(true)

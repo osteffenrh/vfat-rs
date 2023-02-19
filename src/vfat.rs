@@ -1,20 +1,22 @@
-use crate::{
-    fat_reader, fat_writer, ArcMutex, Attributes, BlockDevice, CachedPartition, ClusterId,
-    Directory, FatEntry, Metadata, RegularDirectoryEntry, SectorId, UnknownDirectoryEntry,
-    VfatDirectoryEntry, VfatEntry, VfatRsError, EBPF_VFAT_MAGIC, EBPF_VFAT_MAGIC_ALT,
-};
+use alloc::sync::Arc;
+use core::{fmt, mem};
+
+use binrw::io::Cursor;
+use binrw::BinReaderExt;
+use log::{debug, info};
+use spin::mutex::SpinMutex;
 
 use crate::cluster::{cluster_reader, cluster_writer};
-use crate::fat_table::fat_entry::FAT_ENTRY_SIZE;
+use crate::fat_table::FatEntry;
+use crate::fat_table::FAT_ENTRY_SIZE;
 use crate::formats::extended_bios_parameter_block::FullExtendedBIOSParameterBlock;
 use crate::Path;
 use crate::Result;
-use alloc::sync::Arc;
-use binrw::io::Cursor;
-use binrw::BinReaderExt;
-use core::{fmt, mem};
-use log::{debug, info};
-use spin::mutex::SpinMutex;
+use crate::{
+    fat_table, ArcMutex, Attributes, BlockDevice, CachedPartition, ClusterId, Directory, Metadata,
+    RegularDirectoryEntry, SectorId, UnknownDirectoryEntry, VfatDirectoryEntry, VfatEntry,
+    VfatRsError, EBPF_VFAT_MAGIC, EBPF_VFAT_MAGIC_ALT,
+};
 
 #[derive(Clone)]
 pub struct VfatFS {
@@ -188,14 +190,14 @@ impl VfatFS {
     }
     fn write_entry_in_vfat_table(&self, cluster_id: ClusterId, entry: FatEntry) -> Result<()> {
         let mut dev_lock = self.device.lock();
-        dev_lock.set_fat_entry(cluster_id, entry)
+        fat_table::set_fat_entry(&mut dev_lock, cluster_id, entry)
     }
 
     fn get_last_cluster_in_chain(&self, starting: ClusterId) -> Result<ClusterId> {
         info!("Getting last cluster in the chain..");
         let mut last = starting;
         loop {
-            match fat_reader::next_cluster(last, self.device.clone())? {
+            match fat_table::next_cluster(last, self.device.clone())? {
                 Some(cluster_id) => last = cluster_id,
                 None => return Ok(last),
             }
@@ -223,7 +225,7 @@ impl VfatFS {
 
     /// This will delete all the cluster chain starting from cluster_id.
     pub(crate) fn delete_fat_cluster_chain(&self, cluster_id: ClusterId) -> Result<()> {
-        fat_writer::delete_cluster_chain(cluster_id, self.device.clone())
+        fat_table::delete_cluster_chain(cluster_id, self.device.clone())
     }
 
     /// p should start with `/`.
@@ -299,11 +301,13 @@ impl VfatFS {
 
 #[cfg(test)]
 mod test {
-    use crate::fat_table::fat_entry::FAT_ENTRY_SIZE;
-    use crate::{BlockDevice, CachedPartition, ClusterId, Result, SectorId, VfatFS};
+    use std::sync::Arc;
+
     use binrw::io::Write;
     use spin::mutex::SpinMutex;
-    use std::sync::Arc;
+
+    use crate::fat_table::FAT_ENTRY_SIZE;
+    use crate::{BlockDevice, CachedPartition, ClusterId, Result, SectorId, VfatFS};
 
     pub struct ArrayBackedBlockDevice {
         pub arr: Vec<u8>,

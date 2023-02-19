@@ -1,5 +1,5 @@
 use crate::{
-    error::Result, fat_reader, ArcMutex, BlockDevice, CachedPartition, ClusterId, SectorId, VfatFS,
+    error::Result, fat_table, ArcMutex, BlockDevice, CachedPartition, ClusterId, SectorId, VfatFS,
 };
 use log::{debug, info};
 
@@ -192,7 +192,7 @@ impl ClusterChainWriter {
         if self.current_cluster.is_none() {
             return Ok(None);
         }
-        let mut ret = fat_reader::next_cluster(
+        let mut ret = fat_table::next_cluster(
             self.current_cluster.unwrap(),
             self.vfat_filesystem.device.clone(),
         )?;
