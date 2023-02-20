@@ -45,5 +45,51 @@ impl ClusterChain {
         Ok(amount_read)
     }
 
-     */
+    pub fn seek(&mut self, offset: usize) -> Result<()> {
+        // Calculate in which cluster this offset falls:
+        let cluster_size =
+            self.vfat_fs.device.sectors_per_cluster as usize * self.vfat_fs.device.sector_size;
+        let cluster_offset = (offset as f64 / cluster_size as f64) as usize; //TODO: check it's floor()
+
+        // Calculate in which sector this offset falls:
+        let sector_offset = offset / self.vfat_fs.device.sector_size
+            % self.vfat_fs.device.sectors_per_cluster as usize;
+
+        // Finally, calculate the offset in the selected sector:
+        let offset_in_sector = offset % self.vfat_fs.device.sector_size;
+        info!(
+            "Offset: {}, cluster_offset: {}, sector offset: {}, offset in sector: {}, current cluster: {:?}",
+            offset, cluster_offset, sector_offset, offset_in_sector, self.current_cluster
+        );
+        for _ in 0..cluster_offset {
+            self.current_cluster = self.next_cluster_alloc()?;
+        }
+        info!("Current cluster: {:?}", self.current_cluster);
+        self.cluster_writer = ClusterWriter::new_offset(
+            self.vfat_fs.device.clone(),
+            self.vfat_fs.device.cluster_to_sector(self.current_cluster),
+            SectorId(sector_offset as u32),
+            offset_in_sector,
+        );
+
+        Ok(())
+    }
+
+    fn next_cluster(&self) -> Result<Option<ClusterId>> {
+        if self.current_cluster.is_none() {
+            return Ok(None);
+        }
+        fat_table::next_cluster(self.current_cluster.unwrap(), self.device.clone())
+    }
+    /// Allocates cluster if needed
+    fn next_cluster_alloc(&self) -> Result<ClusterId> {
+        let ret = self.next_cluster();
+        Ok(match ret {
+            None => self
+                .vfat_fs
+                .allocate_cluster_to_chain(self.current_cluster)?,
+            Some(r) => r,
+        })
+    }
+    */
 }
