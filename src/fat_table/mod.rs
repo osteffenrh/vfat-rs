@@ -13,10 +13,7 @@ mod fat_writer;
 
 /// Given a cluster_id, returns the sector id to read in order to get the FAT table entry for
 /// this cluster id.
-fn get_params(
-    device: &mut CachedPartition,
-    cluster_id: ClusterId,
-) -> error::Result<(SectorId, usize)> {
+fn get_params(device: &CachedPartition, cluster_id: ClusterId) -> error::Result<(SectorId, usize)> {
     // this should be 512 / 32 = 18
     let fat_entries_per_sector = device.sector_size / FAT_ENTRY_SIZE;
     // In which sector is this cid contained. Cid: 222 / 18 = 12.3333

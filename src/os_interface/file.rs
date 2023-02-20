@@ -96,8 +96,8 @@ impl File {
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        let mut dev_lock = self.vfat_filesystem.device.as_ref().lock();
-        dev_lock.flush()
+        // TODO, should flush only data wrt this file..
+        self.vfat_filesystem.device.flush()
     }
 
     pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {

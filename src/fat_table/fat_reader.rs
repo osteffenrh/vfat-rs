@@ -3,7 +3,7 @@ use log::info;
 use crate::error::Result;
 use crate::fat_table::fat_entry::FAT_ENTRY_SIZE;
 use crate::fat_table::{get_params, FatEntry};
-use crate::{ArcMutex, BlockDevice};
+use crate::ArcMutex;
 use crate::{CachedPartition, ClusterId};
 
 /// Returns the next clusterid in the chain after the provided cluster_id, if any.
@@ -26,14 +26,12 @@ pub(crate) fn read_fat_entry(
     device: ArcMutex<CachedPartition>,
 ) -> Result<FatEntry> {
     let mut buf = [0u8; FAT_ENTRY_SIZE];
-    let mut dev_lock = device.as_ref().lock();
-
-    let (sector, offset) = get_params(&mut dev_lock, cluster_id)?;
+    let (sector, offset) = get_params(&device, cluster_id)?;
     info!(
         "Requested cid: {}, sector: {}, offset in sector: {}",
         cluster_id, sector, offset
     );
-    dev_lock
+    device
         .read_sector_offset(sector, offset, &mut buf)
         .map(|_| FatEntry::from(buf))
 }

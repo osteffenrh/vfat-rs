@@ -13,8 +13,6 @@ extern crate core;
 
 use alloc::sync::Arc;
 
-use spin::mutex::SpinMutex;
-
 pub(crate) use cache::CachedPartition;
 pub use device::BlockDevice;
 pub use error::{Result, VfatRsError};
@@ -44,4 +42,4 @@ mod vfat;
 const EBPF_VFAT_MAGIC: u8 = 0x28;
 const EBPF_VFAT_MAGIC_ALT: u8 = 0x29;
 
-type ArcMutex<T> = Arc<SpinMutex<T>>;
+type ArcMutex<CachedPartition> = Arc<CachedPartition>;

@@ -3,6 +3,7 @@ use crate::{error, SectorId};
 /// A block device is a computer data storage device that supports reading
 /// and (optionally) writing data in fixed-size blocks, sectors, or clusters.
 /// These blocks are generally 512 bytes or a multiple thereof in size.
+/// TODO: move _offset functions to cachedparittion only.
 pub trait BlockDevice {
     /// Sector size in bytes.
     fn sector_size(&self) -> usize {

@@ -1,7 +1,7 @@
 use log::{debug, info};
 
 use crate::cache::CachedPartition;
-use crate::{fat_table, ArcMutex, BlockDevice, ClusterId, Result, SectorId};
+use crate::{fat_table, ArcMutex, ClusterId, Result, SectorId};
 
 pub(crate) fn cluster_to_sector(
     cluster: ClusterId,
@@ -79,8 +79,7 @@ impl ClusterReader {
 
             let space_left_in_current_sector =
                 self.sector_size - self.offset_byte_in_current_sector;
-            let mut dev_lock = self.device.lock();
-            let amount_read = dev_lock.read_sector_offset(
+            let amount_read = self.device.clone().read_sector_offset(
                 self.current_sector,
                 self.offset_byte_in_current_sector,
                 &mut buf[total_amount_read..core::cmp::min(buf_len, space_left_in_current_sector)],

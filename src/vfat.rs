@@ -4,7 +4,6 @@ use core::{fmt, mem};
 use binrw::io::Cursor;
 use binrw::BinReaderExt;
 use log::{debug, info};
-use spin::mutex::SpinMutex;
 
 use crate::cluster::{cluster_reader, cluster_writer};
 use crate::fat_table::FatEntry;
@@ -88,7 +87,7 @@ impl VfatFS {
         }
         Ok(VfatFS {
             sector_size,
-            device: Arc::new(SpinMutex::new(cached_partition)),
+            device: Arc::new(cached_partition),
             fat_start_sector,
             data_start_sector,
             sectors_per_cluster,
@@ -136,8 +135,8 @@ impl VfatFS {
         for i in 0..self.sectors_per_fat {
             let mut buf = [0; BUF_SIZE];
             info!("reading sector: {}/{}", i, self.sectors_per_fat);
-            let mut device = self.device.lock();
-            device
+            self.device
+                .clone()
                 .read_sector(SectorId(self.fat_start_sector + i), &mut buf)
                 .unwrap();
             let mut fat_entries: [FatEntry; ENTRIES_BUF_SIZE] =
@@ -189,8 +188,7 @@ impl VfatFS {
         Ok(free_cluster_id)
     }
     fn write_entry_in_vfat_table(&self, cluster_id: ClusterId, entry: FatEntry) -> Result<()> {
-        let mut dev_lock = self.device.lock();
-        fat_table::set_fat_entry(&mut dev_lock, cluster_id, entry)
+        fat_table::set_fat_entry(self.device.clone(), cluster_id, entry)
     }
 
     fn get_last_cluster_in_chain(&self, starting: ClusterId) -> Result<ClusterId> {
@@ -304,7 +302,6 @@ mod test {
     use std::sync::Arc;
 
     use binrw::io::Write;
-    use spin::mutex::SpinMutex;
 
     use crate::fat_table::FAT_ENTRY_SIZE;
     use crate::{BlockDevice, CachedPartition, ClusterId, Result, SectorId, VfatFS};
@@ -365,11 +362,7 @@ mod test {
         let sector_size = 1;
         let fat_start_sector = SectorId(0);
         let vfat = VfatFS {
-            device: Arc::new(SpinMutex::new(CachedPartition::new(
-                dev,
-                sector_size,
-                fat_start_sector,
-            ))),
+            device: Arc::new(CachedPartition::new(dev, sector_size, fat_start_sector)),
             fat_start_sector,
             data_start_sector: SectorId(2),
             sectors_per_cluster: 1,

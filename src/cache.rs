@@ -1,13 +1,15 @@
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 
 use log::info;
+use spin::mutex::SpinMutex;
 
 use crate::device::BlockDevice;
 use crate::error::Result;
 use crate::SectorId;
 
 pub(crate) struct CachedPartition {
-    device: Box<dyn BlockDevice>,
+    device: SpinMutex<Box<dyn BlockDevice>>,
     pub(crate) sector_size: usize,
     pub(crate) fat_start_sector: SectorId,
 }
@@ -18,14 +20,52 @@ impl CachedPartition {
     {
         info!("Creating cached partition");
         Self {
-            device: Box::new(device),
+            device: SpinMutex::new(Box::new(device)),
             sector_size,
             fat_start_sector,
         }
     }
 
-    pub fn flush(&mut self) -> Result<()> {
+    pub fn flush(&self) -> Result<()> {
         todo!()
+    }
+
+    pub(crate) fn read_sector(self: Arc<Self>, sector: SectorId, buf: &mut [u8]) -> Result<usize> {
+        let mut dev_lock = self.device.lock();
+        dev_lock.read_sector(sector, buf)
+    }
+
+    pub(crate) fn read_sector_offset(
+        self: Arc<Self>,
+        sector: SectorId,
+        offset: usize,
+        buf: &mut [u8],
+    ) -> Result<usize> {
+        let mut dev_lock = self.device.lock();
+        dev_lock.read_sector_offset(sector, offset, buf)
+    }
+    #[allow(unused)]
+    fn write_sector(self: Arc<Self>, sector: SectorId, buf: &[u8]) -> Result<usize> {
+        let mut dev_lock = self.device.lock();
+        dev_lock.write_sector(sector, buf)
+    }
+
+    pub(crate) fn write_sector_offset(
+        self: Arc<Self>,
+        sector: SectorId,
+        offset: usize,
+        buf: &[u8],
+    ) -> Result<usize> {
+        let mut dev_lock = self.device.lock();
+        dev_lock.write_sector_offset(sector, offset, buf)
+    }
+
+    #[allow(unused)]
+    fn get_canonical_name() -> &'static str
+    where
+        Self: Sized,
+    {
+        "CachePartition"
     }
 }
 /*
@@ -36,36 +76,3 @@ impl Drop for CachedPartition {
     }
 }
  */
-impl BlockDevice for CachedPartition {
-    fn read_sector(&mut self, sector: SectorId, buf: &mut [u8]) -> Result<usize> {
-        self.device.read_sector(sector, buf)
-    }
-    fn read_sector_offset(
-        &mut self,
-        sector: SectorId,
-        offset: usize,
-        buf: &mut [u8],
-    ) -> Result<usize> {
-        self.device.read_sector_offset(sector, offset, buf)
-    }
-
-    fn write_sector(&mut self, sector: SectorId, buf: &[u8]) -> Result<usize> {
-        self.device.write_sector(sector, buf)
-    }
-
-    fn write_sector_offset(
-        &mut self,
-        sector: SectorId,
-        offset: usize,
-        buf: &[u8],
-    ) -> Result<usize> {
-        self.device.write_sector_offset(sector, offset, buf)
-    }
-
-    fn get_canonical_name() -> &'static str
-    where
-        Self: Sized,
-    {
-        "CachePartition"
-    }
-}

@@ -1,6 +1,4 @@
-use crate::{
-    error::Result, fat_table, ArcMutex, BlockDevice, CachedPartition, ClusterId, SectorId, VfatFS,
-};
+use crate::{error::Result, fat_table, ArcMutex, CachedPartition, ClusterId, SectorId, VfatFS};
 use log::{debug, info};
 
 #[derive(Clone)]
@@ -61,8 +59,7 @@ impl ClusterWriter {
             debug!("CW: Total written: {}", total_written);
             let space_left_in_current_sector =
                 self.sector_size - self.offset_byte_in_current_sector;
-            let mut dev_lock = self.device.as_ref().lock();
-            let amount_written = dev_lock.write_sector_offset(
+            let amount_written = self.device.clone().write_sector_offset(
                 self.current_sector,
                 self.offset_byte_in_current_sector,
                 &buf[total_written
@@ -91,8 +88,7 @@ impl ClusterWriter {
     }
 
     fn _flush(&mut self) -> core::result::Result<(), binrw::io::Error> {
-        let mut dev_lock = self.device.lock();
-        Ok(dev_lock.flush()?)
+        Ok(self.device.flush()?)
     }
 }
 
@@ -242,7 +238,6 @@ impl ClusterChainWriter {
     }
 
     fn _flush(&mut self) -> Result<()> {
-        let mut dev_lock = self.vfat_filesystem.device.as_ref().lock();
-        dev_lock.flush()
+        self.vfat_filesystem.device.flush()
     }
 }

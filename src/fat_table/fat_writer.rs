@@ -1,8 +1,9 @@
+use alloc::sync::Arc;
 use log::info;
 
 use crate::error::Result;
 use crate::fat_table::{get_params, FatEntry};
-use crate::{fat_table, ArcMutex, BlockDevice, CachedPartition, ClusterId};
+use crate::{fat_table, ArcMutex, CachedPartition, ClusterId};
 
 /// Delete a cluster chain starting from `current`.
 /// TODO: Start from the end of the chain to make the operation safer.
@@ -14,23 +15,21 @@ pub(crate) fn delete_cluster_chain(
 ) -> Result<()> {
     const DELETED_ENTRY: FatEntry = FatEntry::Unused;
     while let Some(next) = fat_table::next_cluster(current, device.clone())? {
-        let mut dev_lock = device.lock();
-        set_fat_entry(&mut dev_lock, current, DELETED_ENTRY)?;
+        set_fat_entry(device.clone(), current, DELETED_ENTRY)?;
         current = next;
     }
 
-    let mut dev_lock = device.lock();
-    set_fat_entry(&mut dev_lock, current, DELETED_ENTRY)?;
+    set_fat_entry(device.clone(), current, DELETED_ENTRY)?;
 
     Ok(())
 }
 
 pub(crate) fn set_fat_entry(
-    device: &mut CachedPartition,
+    device: Arc<CachedPartition>,
     cluster_id: ClusterId,
     entry: FatEntry,
 ) -> Result<()> {
-    let (sector, offset) = get_params(device, cluster_id)?;
+    let (sector, offset) = get_params(&device, cluster_id)?;
 
     info!(
         "Requested cid: {}, containing sector: {}, offset in sector: {}",
