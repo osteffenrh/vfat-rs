@@ -6,6 +6,7 @@ use spin::mutex::SpinMutex;
 
 use crate::device::BlockDevice;
 use crate::error::Result;
+use crate::formats::cluster_id::ClusterId;
 use crate::SectorId;
 
 /// An interface to the underlaying Block Device.
@@ -15,6 +16,7 @@ pub(crate) struct CachedPartition {
     pub(crate) sector_size: usize,
     pub(crate) fat_start_sector: SectorId,
     pub(crate) sectors_per_cluster: u32,
+    pub(crate) data_start_sector: SectorId,
 }
 impl CachedPartition {
     pub fn new<T>(
@@ -22,6 +24,7 @@ impl CachedPartition {
         sector_size: usize,
         fat_start_sector: SectorId,
         sectors_per_cluster: u32,
+        data_start_sector: SectorId,
     ) -> Self
     where
         T: BlockDevice + 'static,
@@ -32,6 +35,7 @@ impl CachedPartition {
             sector_size,
             fat_start_sector,
             sectors_per_cluster,
+            data_start_sector,
         }
     }
 
@@ -67,6 +71,16 @@ impl CachedPartition {
     ) -> Result<usize> {
         let mut dev_lock = self.device.lock();
         dev_lock.write_sector_offset(sector, offset, buf)
+    }
+
+    /// Converts a cluster (a FAT concept) to a sector (a BlockDevice concept).
+    ///
+    /// To do so, it uses some useful info from the BPB section.
+    pub(crate) fn cluster_to_sector(&self, cluster: ClusterId) -> SectorId {
+        let selected_sector =
+            u32::from(cluster).saturating_sub(2) * self.sectors_per_cluster as u32;
+        let sect = self.data_start_sector.0 as u32 + selected_sector as u32;
+        SectorId(sect)
     }
 
     #[allow(unused)]

@@ -3,11 +3,11 @@ use log::{debug, info};
 
 #[derive(Clone)]
 struct ClusterWriter {
-    pub device: ArcMutex<CachedPartition>,
-    pub current_sector: SectorId,
+    device: ArcMutex<CachedPartition>,
+    current_sector: SectorId,
     /// Offset in current_sector. In case buf.len()%sector_size != 0, this sector is not full read.
     /// The next read call will start from this offset.
-    pub offset_byte_in_current_sector: usize,
+    offset_byte_in_current_sector: usize,
     final_sector: SectorId,
 }
 
@@ -79,68 +79,59 @@ impl ClusterWriter {
     }
 }
 
-#[derive(Clone)]
 pub struct ClusterChainWriter {
-    vfat_filesystem: VfatFS,
+    vfat_fs: VfatFS,
     cluster_writer: ClusterWriter,
-    //TODO: no need to wrap in an option
-    current_cluster: Option<ClusterId>,
+    current_cluster: ClusterId,
 }
 impl ClusterChainWriter {
     pub(crate) fn new_w_offset(
-        vfat_filesystem: VfatFS,
+        vfat_fs: VfatFS,
         start_cluster: ClusterId,
         offset_sector_in_cluster: SectorId,
         offset_in_sector: usize,
     ) -> Self {
         let cluster_writer = ClusterWriter::new_offset(
-            vfat_filesystem.device.clone(),
-            vfat_filesystem.cluster_to_sector(start_cluster),
+            vfat_fs.device.clone(),
+            vfat_fs.device.cluster_to_sector(start_cluster),
             offset_sector_in_cluster,
             offset_in_sector,
         );
         Self {
-            vfat_filesystem,
-            current_cluster: Some(start_cluster),
+            vfat_fs,
+            current_cluster: start_cluster,
             cluster_writer,
         }
     }
 
     ///
     /// start_sector: start on a different sector other then the one at beginning of the cluster.
-    pub(crate) fn new(vfat_filesystem: VfatFS, start_cluster: ClusterId) -> Self {
-        let cluster_start = vfat_filesystem.cluster_to_sector(start_cluster);
-        let cluster_writer =
-            ClusterWriter::new(vfat_filesystem.device.clone(), cluster_start, SectorId(0));
+    pub(crate) fn new(vfat_fs: VfatFS, start_cluster: ClusterId) -> Self {
+        let cluster_start = vfat_fs.device.cluster_to_sector(start_cluster);
+        let cluster_writer = ClusterWriter::new(vfat_fs.device.clone(), cluster_start, SectorId(0));
         Self {
-            vfat_filesystem,
-            current_cluster: Some(start_cluster),
+            vfat_fs,
+            current_cluster: start_cluster,
             cluster_writer,
         }
     }
     fn cluster_writer_builder(&self) -> ClusterWriter {
-        let start_sector = self
-            .vfat_filesystem
-            .cluster_to_sector(self.current_cluster.unwrap());
-        ClusterWriter::new(
-            self.vfat_filesystem.device.clone(),
-            start_sector,
-            SectorId(0),
-        )
+        let start_sector = self.vfat_fs.device.cluster_to_sector(self.current_cluster);
+        ClusterWriter::new(self.vfat_fs.device.clone(), start_sector, SectorId(0))
     }
-    // TODO: move to impl Seek trait.
+
     pub fn seek(&mut self, offset: usize) -> Result<()> {
         // Calculate in which cluster this offset falls:
         let cluster_size =
-            self.vfat_filesystem.sectors_per_cluster as usize * self.vfat_filesystem.sector_size;
+            self.vfat_fs.device.sectors_per_cluster as usize * self.vfat_fs.device.sector_size;
         let cluster_offset = (offset as f64 / cluster_size as f64) as usize; //TODO: check it's floor()
 
         // Calculate in which sector this offset falls:
-        let sector_offset = offset / self.vfat_filesystem.sector_size
-            % self.vfat_filesystem.sectors_per_cluster as usize;
+        let sector_offset = offset / self.vfat_fs.device.sector_size
+            % self.vfat_fs.device.sectors_per_cluster as usize;
 
         // Finally, calculate the offset in the selected sector:
-        let offset_in_sector = offset % self.vfat_filesystem.sector_size;
+        let offset_in_sector = offset % self.vfat_fs.device.sector_size;
         info!(
             "Offset: {}, cluster_offset: {}, sector offset: {}, offset in sector: {}, current cluster: {:?}",
             offset, cluster_offset, sector_offset, offset_in_sector, self.current_cluster
@@ -151,33 +142,27 @@ impl ClusterChainWriter {
         }
         info!("Current cluster: {:?}", self.current_cluster);
         self.cluster_writer = ClusterWriter::new_offset(
-            self.vfat_filesystem.device.clone(),
-            self.vfat_filesystem
-                .cluster_to_sector(self.current_cluster.unwrap()),
+            self.vfat_fs.device.clone(),
+            self.vfat_fs.device.cluster_to_sector(self.current_cluster),
             SectorId(sector_offset as u32),
             offset_in_sector,
         );
 
         Ok(())
     }
-    fn next_cluster(&mut self) -> Result<Option<ClusterId>> {
-        if self.current_cluster.is_none() {
-            return Ok(None);
-        }
-        let mut ret = fat_table::next_cluster(
-            self.current_cluster.unwrap(),
-            self.vfat_filesystem.device.clone(),
-        )?;
-        if ret.is_none() {
-            ret = Some(
-                self.vfat_filesystem
-                    .allocate_cluster_to_chain(self.current_cluster.unwrap())?,
-            );
-        }
-        Ok(ret)
+    fn next_cluster(&mut self) -> Result<ClusterId> {
+        let ret = fat_table::next_cluster(self.current_cluster, self.vfat_fs.device.clone())?;
+
+        Ok(match ret {
+            None => self
+                .vfat_fs
+                .allocate_cluster_to_chain(self.current_cluster)?,
+            Some(r) => r,
+        })
     }
+
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        if self.current_cluster.is_none() || buf.is_empty() {
+        if buf.is_empty() {
             info!(
                 "Current cluster is: {:?}. Buf len: {}. Returning...",
                 self.current_cluster,
@@ -185,10 +170,9 @@ impl ClusterChainWriter {
             );
             return Ok(0);
         }
-        assert!(
-            self.current_cluster
-                .filter(|id| u32::from(*id) != 0)
-                .is_some(),
+        assert_ne!(
+            self.current_cluster,
+            ClusterId::new(0),
             "current cluster is ClusterId(0)."
         );
         debug!(
@@ -197,16 +181,12 @@ impl ClusterChainWriter {
         );
 
         let mut amount_written = 0;
-        while amount_written < buf.len() && self.current_cluster.is_some() {
+        while amount_written < buf.len() {
             let current_amount_written = self.cluster_writer.write(&buf[amount_written..])?;
             amount_written += current_amount_written;
             if current_amount_written == 0 {
                 self.current_cluster = self.next_cluster()?;
-                if self.current_cluster.is_some() {
-                    // If there is another cluster in the chain,
-                    // create a new cluster writer.
-                    self.cluster_writer = self.cluster_writer_builder();
-                }
+                self.cluster_writer = self.cluster_writer_builder();
             }
         }
         info!("CWW: Amount writen: {}", amount_written);
@@ -214,6 +194,6 @@ impl ClusterChainWriter {
     }
 
     fn _flush(&mut self) -> Result<()> {
-        self.vfat_filesystem.device.flush()
+        self.vfat_fs.device.flush()
     }
 }

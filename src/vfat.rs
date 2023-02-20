@@ -78,8 +78,13 @@ impl VfatFS {
         let root_cluster = ClusterId::new(full_ebpb.extended.root_cluster);
         let eoc_marker = Self::read_end_of_chain_marker(&mut device, fat_start_sector)?;
         let sector_size = device.sector_size();
-        let cached_partition =
-            CachedPartition::new(device, sector_size, fat_start_sector, sectors_per_cluster);
+        let cached_partition = CachedPartition::new(
+            device,
+            sector_size,
+            fat_start_sector,
+            sectors_per_cluster,
+            data_start_sector,
+        );
         let sectors_per_fat = full_ebpb.extended.sectors_per_fat;
         if full_ebpb.extended.signature != EBPF_VFAT_MAGIC
             && full_ebpb.extended.signature != EBPF_VFAT_MAGIC_ALT
@@ -116,16 +121,6 @@ impl VfatFS {
     fn new_last_cluster_fat_entry(&self) -> FatEntry {
         // Last cluster is initialized with the eoc_marker
         FatEntry::LastCluster(self.eoc_marker.into())
-    }
-
-    /// Converts a cluster (a FAT concept) to a sector (a BlockDevice concept).
-    ///
-    /// To do so, it uses some useful info from the BPB section.
-    pub(crate) fn cluster_to_sector(&self, cluster: ClusterId) -> SectorId {
-        let selected_sector =
-            u32::from(cluster).saturating_sub(2) * self.sectors_per_cluster as u32;
-        let sect = self.data_start_sector.0 as u32 + selected_sector as u32;
-        SectorId(sect)
     }
 
     /// Find next free cluster
@@ -365,15 +360,17 @@ mod test {
         let sector_size = 1;
         let fat_start_sector = SectorId(0);
         let sectors_per_cluster = 1;
+        let data_start_sector = SectorId(2);
         let vfat = VfatFS {
             device: Arc::new(CachedPartition::new(
                 dev,
                 sector_size,
                 fat_start_sector,
                 sectors_per_cluster,
+                data_start_sector,
             )),
             fat_start_sector,
-            data_start_sector: SectorId(2),
+            data_start_sector,
             sectors_per_cluster,
             sectors_per_fat: 1,
             root_cluster: ClusterId::new(0),

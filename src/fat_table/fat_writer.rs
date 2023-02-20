@@ -19,7 +19,7 @@ pub(crate) fn delete_cluster_chain(
         current = next;
     }
 
-    set_fat_entry(device.clone(), current, DELETED_ENTRY)?;
+    set_fat_entry(device, current, DELETED_ENTRY)?;
 
     Ok(())
 }

@@ -17,7 +17,6 @@ pub(crate) fn cluster_to_sector(
 /// It reads from the beginning of the cluster.
 /// It's not thread-safe and should not be shared.
 /// Given a buffer buf, it will try to read as much sectors as it can in order to fill the buffer.
-#[derive(Clone)]
 struct ClusterReader {
     pub device: ArcMutex<CachedPartition>,
     pub sector_size: usize,
@@ -113,7 +112,6 @@ impl ClusterReader {
 
 /// this implements and encapsulates the logic needed to traverse
 /// cluster chains, by reading the FAT table.
-#[derive(Clone)]
 pub(crate) struct ClusterChainReader {
     pub device: ArcMutex<CachedPartition>,
     pub sector_size: usize,
