@@ -4,7 +4,6 @@ use log::{debug, info};
 #[derive(Clone)]
 struct ClusterWriter {
     pub device: ArcMutex<CachedPartition>,
-    pub sector_size: usize,
     pub current_sector: SectorId,
     /// Offset in current_sector. In case buf.len()%sector_size != 0, this sector is not full read.
     /// The next read call will start from this offset.
@@ -18,33 +17,21 @@ impl ClusterWriter {
         device: ArcMutex<CachedPartition>,
         cluster_start: SectorId,
         offset_sector_in_cluster: SectorId,
-        sectors_per_cluster: u32,
-        sector_size: usize,
         offset_byte_in_current_sector: usize,
     ) -> Self {
         Self {
             device,
-            sector_size,
             offset_byte_in_current_sector,
             current_sector: cluster_start + offset_sector_in_cluster,
-            final_sector: SectorId(sectors_per_cluster) + cluster_start,
+            final_sector: SectorId(device.sectors_per_cluster) + cluster_start,
         }
     }
     pub fn new(
         device: ArcMutex<CachedPartition>,
         cluster_start: SectorId,
         offset_sector_in_cluster: SectorId,
-        sectors_per_cluster: u32,
-        sector_size: usize,
     ) -> Self {
-        Self::new_offset(
-            device,
-            cluster_start,
-            offset_sector_in_cluster,
-            sectors_per_cluster,
-            sector_size,
-            0,
-        )
+        Self::new_offset(device, cluster_start, offset_sector_in_cluster, 0)
     }
     fn is_over(&self) -> bool {
         self.current_sector >= self.final_sector
@@ -58,7 +45,7 @@ impl ClusterWriter {
         while total_written < buf.len() && !self.is_over() {
             debug!("CW: Total written: {}", total_written);
             let space_left_in_current_sector =
-                self.sector_size - self.offset_byte_in_current_sector;
+                self.device.sector_size - self.offset_byte_in_current_sector;
             let amount_written = self.device.clone().write_sector_offset(
                 self.current_sector,
                 self.offset_byte_in_current_sector,
@@ -73,11 +60,11 @@ impl ClusterWriter {
                 total_written,
                 self.current_sector,
                 self.offset_byte_in_current_sector,
-                self.sector_size
+                self.device.sector_size
             );
-            assert!(self.offset_byte_in_current_sector <= self.sector_size);
+            assert!(self.offset_byte_in_current_sector <= self.device.sector_size);
 
-            if self.offset_byte_in_current_sector == self.sector_size {
+            if self.offset_byte_in_current_sector == self.device.sector_size {
                 debug!("Sector is finished, going to switch sector...");
                 self.current_sector = SectorId(self.current_sector.0 + 1);
                 self.offset_byte_in_current_sector = 0;
@@ -110,8 +97,6 @@ impl ClusterChainWriter {
             vfat_filesystem.device.clone(),
             vfat_filesystem.cluster_to_sector(start_cluster),
             offset_sector_in_cluster,
-            vfat_filesystem.sectors_per_cluster,
-            vfat_filesystem.sector_size,
             offset_in_sector,
         );
         Self {
@@ -125,13 +110,8 @@ impl ClusterChainWriter {
     /// start_sector: start on a different sector other then the one at beginning of the cluster.
     pub(crate) fn new(vfat_filesystem: VfatFS, start_cluster: ClusterId) -> Self {
         let cluster_start = vfat_filesystem.cluster_to_sector(start_cluster);
-        let cluster_writer = ClusterWriter::new(
-            vfat_filesystem.device.clone(),
-            cluster_start,
-            SectorId(0),
-            vfat_filesystem.sectors_per_cluster,
-            vfat_filesystem.sector_size,
-        );
+        let cluster_writer =
+            ClusterWriter::new(vfat_filesystem.device.clone(), cluster_start, SectorId(0));
         Self {
             vfat_filesystem,
             current_cluster: Some(start_cluster),
@@ -146,8 +126,6 @@ impl ClusterChainWriter {
             self.vfat_filesystem.device.clone(),
             start_sector,
             SectorId(0),
-            self.vfat_filesystem.sectors_per_cluster,
-            self.vfat_filesystem.sector_size,
         )
     }
     // TODO: move to impl Seek trait.
@@ -177,8 +155,6 @@ impl ClusterChainWriter {
             self.vfat_filesystem
                 .cluster_to_sector(self.current_cluster.unwrap()),
             SectorId(sector_offset as u32),
-            self.vfat_filesystem.sectors_per_cluster,
-            self.vfat_filesystem.sector_size,
             offset_in_sector,
         );
 

@@ -8,13 +8,21 @@ use crate::device::BlockDevice;
 use crate::error::Result;
 use crate::SectorId;
 
+/// An interface to the underlaying Block Device.
+/// It will cache entries, and help with reading and writing sectors.
 pub(crate) struct CachedPartition {
     device: SpinMutex<Box<dyn BlockDevice>>,
     pub(crate) sector_size: usize,
     pub(crate) fat_start_sector: SectorId,
+    pub(crate) sectors_per_cluster: u32,
 }
 impl CachedPartition {
-    pub fn new<T>(device: T, sector_size: usize, fat_start_sector: SectorId) -> Self
+    pub fn new<T>(
+        device: T,
+        sector_size: usize,
+        fat_start_sector: SectorId,
+        sectors_per_cluster: u32,
+    ) -> Self
     where
         T: BlockDevice + 'static,
     {
@@ -23,6 +31,7 @@ impl CachedPartition {
             device: SpinMutex::new(Box::new(device)),
             sector_size,
             fat_start_sector,
+            sectors_per_cluster,
         }
     }
 

@@ -19,6 +19,8 @@ use crate::{
 
 #[derive(Clone)]
 pub struct VfatFS {
+    // we need arc around device, because _maybe_ something might need to `Send` this device or Vfat
+    // to a different thread.
     pub(crate) device: ArcMutex<CachedPartition>,
     /// Sector of the file allocation table
     pub(crate) fat_start_sector: SectorId,
@@ -76,7 +78,8 @@ impl VfatFS {
         let root_cluster = ClusterId::new(full_ebpb.extended.root_cluster);
         let eoc_marker = Self::read_end_of_chain_marker(&mut device, fat_start_sector)?;
         let sector_size = device.sector_size();
-        let cached_partition = CachedPartition::new(device, sector_size, fat_start_sector);
+        let cached_partition =
+            CachedPartition::new(device, sector_size, fat_start_sector, sectors_per_cluster);
         let sectors_per_fat = full_ebpb.extended.sectors_per_fat;
         if full_ebpb.extended.signature != EBPF_VFAT_MAGIC
             && full_ebpb.extended.signature != EBPF_VFAT_MAGIC_ALT

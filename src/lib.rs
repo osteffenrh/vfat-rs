@@ -42,4 +42,6 @@ mod vfat;
 const EBPF_VFAT_MAGIC: u8 = 0x28;
 const EBPF_VFAT_MAGIC_ALT: u8 = 0x29;
 
+/// Why Arc? Because CachedPartition owns the block device. And
+/// Vfat needs to be cloned, and potentially we could send references across threads.
 type ArcMutex<CachedPartition> = Arc<CachedPartition>;
