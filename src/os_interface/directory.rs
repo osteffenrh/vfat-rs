@@ -146,9 +146,8 @@ impl Directory {
             found_spot_start_index, entries
         );
         let spot_memory_offset = found_spot_start_index * mem::size_of::<UnknownDirectoryEntry>();
-        let offset_in_sector = spot_memory_offset % self.vfat_filesystem.sector_size;
-
-        let sector_offset = (spot_memory_offset / self.vfat_filesystem.sector_size) as u32;
+        let offset_in_sector = spot_memory_offset % self.vfat_filesystem.device.sector_size;
+        let sector_offset = (spot_memory_offset / self.vfat_filesystem.device.sector_size) as u32;
 
         let mut ccw = ClusterChainWriter::new_w_offset(
             self.vfat_filesystem.clone(),
@@ -428,7 +427,7 @@ impl Directory {
         cluster: ClusterId,
     ) -> error::Result<()> {
         let entries_per_sector =
-            self.vfat_filesystem.sector_size / mem::size_of::<UnknownDirectoryEntry>();
+            self.vfat_filesystem.device.sector_size / mem::size_of::<UnknownDirectoryEntry>();
         let containing_sector = (index as f64 / entries_per_sector as f64).floor() as u32;
         let offset_in_sector = (index % entries_per_sector)
             .checked_mul(mem::size_of::<UnknownDirectoryEntry>())

@@ -24,17 +24,12 @@ pub struct VfatFS {
     pub(crate) device: ArcMutex<CachedPartition>,
     /// Sector of the file allocation table
     pub(crate) fat_start_sector: SectorId,
-    /// First sector containing actual data - after all FAT tables.
-    pub(crate) data_start_sector: SectorId,
-    /// How many sectors are mapped to a single cluster
-    pub(crate) sectors_per_cluster: u32,
     /// How many sectors each fat table uses.
     pub(crate) sectors_per_fat: u32,
     /// Id for the root_cluster
     pub(crate) root_cluster: ClusterId,
     /// End of chain marker
     pub(crate) eoc_marker: FatEntry,
-    pub(crate) sector_size: usize,
 }
 
 impl fmt::Debug for VfatFS {
@@ -94,11 +89,8 @@ impl VfatFS {
             });
         }
         Ok(VfatFS {
-            sector_size,
             device: Arc::new(cached_partition),
             fat_start_sector,
-            data_start_sector,
-            sectors_per_cluster,
             root_cluster,
             eoc_marker,
             sectors_per_fat,
@@ -134,11 +126,9 @@ impl VfatFS {
             let mut buf = [0; BUF_SIZE];
             info!("reading sector: {}/{}", i, self.sectors_per_fat);
             self.device
-                .clone()
                 .read_sector(SectorId(self.fat_start_sector + i), &mut buf)
                 .unwrap();
-            let mut fat_entries: [FatEntry; ENTRIES_BUF_SIZE] =
-                [Default::default(); ENTRIES_BUF_SIZE];
+            let mut fat_entries = [FatEntry::default(); ENTRIES_BUF_SIZE];
 
             for (i, bytes) in buf.chunks(4).enumerate() {
                 fat_entries[i] = FatEntry::new_ref(bytes);
@@ -210,13 +200,7 @@ impl VfatFS {
         &self,
         cluster_id: ClusterId,
     ) -> cluster_reader::ClusterChainReader {
-        cluster_reader::ClusterChainReader::new(
-            self.device.clone(),
-            self.sector_size,
-            self.sectors_per_cluster,
-            cluster_id,
-            self.data_start_sector,
-        )
+        cluster_reader::ClusterChainReader::new(self.device.clone(), cluster_id)
     }
 
     /// This will delete all the cluster chain starting from cluster_id.
@@ -370,12 +354,9 @@ mod test {
                 data_start_sector,
             )),
             fat_start_sector,
-            data_start_sector,
-            sectors_per_cluster,
             sectors_per_fat: 1,
             root_cluster: ClusterId::new(0),
             eoc_marker: Default::default(),
-            sector_size,
         };
         assert_eq!(
             vfat.find_free_cluster().unwrap().unwrap(),

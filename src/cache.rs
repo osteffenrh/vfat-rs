@@ -15,7 +15,9 @@ pub(crate) struct CachedPartition {
     device: SpinMutex<Box<dyn BlockDevice>>,
     pub(crate) sector_size: usize,
     pub(crate) fat_start_sector: SectorId,
+    /// How many sectors are mapped to a single cluster
     pub(crate) sectors_per_cluster: u32,
+    /// First sector containing actual data - after all FAT tables.
     pub(crate) data_start_sector: SectorId,
 }
 impl CachedPartition {
@@ -43,7 +45,7 @@ impl CachedPartition {
         todo!()
     }
 
-    pub(crate) fn read_sector(self: Arc<Self>, sector: SectorId, buf: &mut [u8]) -> Result<usize> {
+    pub(crate) fn read_sector(&self, sector: SectorId, buf: &mut [u8]) -> Result<usize> {
         let mut dev_lock = self.device.lock();
         dev_lock.read_sector(sector, buf)
     }
