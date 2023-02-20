@@ -20,10 +20,10 @@ impl ClusterWriter {
         offset_byte_in_current_sector: usize,
     ) -> Self {
         Self {
+            final_sector: SectorId(device.sectors_per_cluster) + cluster_start,
             device,
             offset_byte_in_current_sector,
             current_sector: cluster_start + offset_sector_in_cluster,
-            final_sector: SectorId(device.sectors_per_cluster) + cluster_start,
         }
     }
     pub fn new(

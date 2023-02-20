@@ -364,11 +364,17 @@ mod test {
         };
         let sector_size = 1;
         let fat_start_sector = SectorId(0);
+        let sectors_per_cluster = 1;
         let vfat = VfatFS {
-            device: Arc::new(CachedPartition::new(dev, sector_size, fat_start_sector)),
+            device: Arc::new(CachedPartition::new(
+                dev,
+                sector_size,
+                fat_start_sector,
+                sectors_per_cluster,
+            )),
             fat_start_sector,
             data_start_sector: SectorId(2),
-            sectors_per_cluster: 1,
+            sectors_per_cluster,
             sectors_per_fat: 1,
             root_cluster: ClusterId::new(0),
             eoc_marker: Default::default(),
