@@ -193,7 +193,7 @@ impl VfatFS {
         &self,
         cluster_id: ClusterId,
     ) -> cluster_writer::ClusterChainWriter {
-        cluster_writer::ClusterChainWriter::new(self.clone(), cluster_id)
+        cluster_writer::ClusterChainWriter::new(self.clone(), cluster_id, SectorId::from(0), 0)
     }
 
     pub(crate) fn cluster_chain_reader(

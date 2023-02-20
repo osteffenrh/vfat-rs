@@ -149,7 +149,7 @@ impl Directory {
         let offset_in_sector = spot_memory_offset % self.vfat_filesystem.device.sector_size;
         let sector_offset = (spot_memory_offset / self.vfat_filesystem.device.sector_size) as u32;
 
-        let mut ccw = ClusterChainWriter::new_w_offset(
+        let mut ccw = ClusterChainWriter::new(
             self.vfat_filesystem.clone(),
             cluster_id,
             SectorId(sector_offset),
@@ -438,7 +438,7 @@ impl Directory {
         debug!("Update entry by index, going to update entry index: {}, in sectorId: {}, in cluster: {}, with offset_in_sector: {}",
         index, containing_sector, self.metadata.cluster, offset_in_sector);
 
-        let mut ccw = ClusterChainWriter::new_w_offset(
+        let mut ccw = ClusterChainWriter::new(
             self.vfat_filesystem.clone(),
             cluster,
             SectorId(containing_sector),

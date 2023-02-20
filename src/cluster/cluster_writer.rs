@@ -1,5 +1,5 @@
 use crate::{error::Result, fat_table, ClusterId, SectorId, VfatFS};
-use log::{debug, info};
+use log::debug;
 
 pub struct ClusterChainWriter {
     vfat_fs: VfatFS,
@@ -11,24 +11,31 @@ pub struct ClusterChainWriter {
 }
 
 impl ClusterChainWriter {
-    pub(crate) fn new_w_offset(
+    pub(crate) fn new(
         vfat_fs: VfatFS,
         start_cluster: ClusterId,
         offset_sector_in_cluster: SectorId,
         offset_in_sector: usize,
     ) -> Self {
-        let cluster_start = vfat_fs.device.cluster_to_sector(start_cluster);
+        let current_sector =
+            vfat_fs.device.cluster_to_sector(start_cluster) + offset_sector_in_cluster;
         Self {
-            offset_byte_in_current_sector: offset_in_sector,
-            current_sector: cluster_start + offset_sector_in_cluster,
             current_cluster: start_cluster,
+            offset_byte_in_current_sector: offset_in_sector,
+            current_sector,
             vfat_fs,
         }
     }
 
-    /// start_sector: start on a different sector other then the one at beginning of the cluster.
-    pub(crate) fn new(vfat_fs: VfatFS, start_cluster: ClusterId) -> Self {
-        Self::new_w_offset(vfat_fs, start_cluster, SectorId::from(0), 0)
+    fn next_cluster_alloc(&mut self) -> Result<ClusterId> {
+        let ret = fat_table::next_cluster(self.current_cluster, self.vfat_fs.device.clone())?;
+
+        Ok(match ret {
+            None => self
+                .vfat_fs
+                .allocate_cluster_to_chain(self.current_cluster)?,
+            Some(r) => r,
+        })
     }
 
     pub fn seek(&mut self, offset: usize) -> Result<()> {
@@ -54,17 +61,6 @@ impl ClusterChainWriter {
         Ok(())
     }
 
-    fn next_cluster_alloc(&mut self) -> Result<ClusterId> {
-        let ret = fat_table::next_cluster(self.current_cluster, self.vfat_fs.device.clone())?;
-
-        Ok(match ret {
-            None => self
-                .vfat_fs
-                .allocate_cluster_to_chain(self.current_cluster)?,
-            Some(r) => r,
-        })
-    }
-
     pub fn write(&mut self, buf: &[u8]) -> Result<usize> {
         if buf.is_empty() {
             return Ok(0);
@@ -76,36 +72,35 @@ impl ClusterChainWriter {
             "current cluster is ClusterId(0)."
         );
 
-        let mut amount_written = 0;
-        while amount_written < buf.len() {
-            let current_amount_written = self.write_cluster(&buf[amount_written..])?;
-            amount_written += current_amount_written;
+        let mut amount = 0;
+        while amount < buf.len() {
+            let current_amount_written = self.write_cluster(&buf[amount..])?;
+            amount += current_amount_written;
             if current_amount_written == 0 {
                 self.current_cluster = self.next_cluster_alloc()?;
                 self.current_sector = self.vfat_fs.device.cluster_to_sector(self.current_cluster);
                 self.offset_byte_in_current_sector = 0;
             }
         }
-        debug!("CWW: Amount writen: {}", amount_written);
-        Ok(amount_written)
+        debug!("CWW: Amount writen: {}", amount);
+        Ok(amount)
     }
 
-    fn write_cluster(&mut self, buf: &[u8]) -> core::result::Result<usize, binrw::io::Error> {
-        if self.is_over() || buf.is_empty() {
+    fn write_cluster(&mut self, buf: &[u8]) -> Result<usize> {
+        if self.cluster_is_over() || buf.is_empty() {
             return Ok(0);
         }
-        let mut total_written = 0;
-        while total_written < buf.len() && !self.is_over() {
+        let mut total = 0;
+        while total < buf.len() && !self.cluster_is_over() {
             let space_left_in_current_sector =
                 self.vfat_fs.device.sector_size - self.offset_byte_in_current_sector;
-            let amount_written = self.vfat_fs.device.clone().write_sector_offset(
+            let amount = self.vfat_fs.device.clone().write_sector_offset(
                 self.current_sector,
                 self.offset_byte_in_current_sector,
-                &buf[total_written
-                    ..core::cmp::min(total_written + space_left_in_current_sector, buf.len())],
+                &buf[total..core::cmp::min(total + space_left_in_current_sector, buf.len())],
             )?;
-            total_written += amount_written;
-            self.offset_byte_in_current_sector += amount_written;
+            total += amount;
+            self.offset_byte_in_current_sector += amount;
             assert!(self.offset_byte_in_current_sector <= self.vfat_fs.device.sector_size);
 
             if self.offset_byte_in_current_sector == self.vfat_fs.device.sector_size {
@@ -114,10 +109,10 @@ impl ClusterChainWriter {
                 self.offset_byte_in_current_sector = 0;
             }
         }
-        Ok(total_written)
+        Ok(total)
     }
 
-    fn is_over(&self) -> bool {
+    fn cluster_is_over(&self) -> bool {
         let cluster_start = self.vfat_fs.device.cluster_to_sector(self.current_cluster);
         let final_sector = SectorId(self.vfat_fs.device.sectors_per_cluster) + cluster_start;
         self.current_sector >= final_sector
