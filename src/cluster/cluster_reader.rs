@@ -34,6 +34,7 @@ impl ClusterChainReader {
     }
 
     /// Assumptions: offset less then this object's size.
+    /// Also: this allows seeking only forward, not backwards.
     pub fn seek(&mut self, offset: usize) -> Result<()> {
         // Calculate in which cluster this offset falls:
         let cluster_size = self.device.sectors_per_cluster as usize * self.device.sector_size;

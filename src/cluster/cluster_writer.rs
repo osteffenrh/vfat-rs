@@ -38,6 +38,8 @@ impl ClusterChainWriter {
         })
     }
 
+    // If the offset is outside file, it will allocate clusters to accommodate requested seek size.
+    /// Also: this allows seeking only forward, not backwards.
     pub fn seek(&mut self, offset: usize) -> Result<()> {
         // Calculate in which cluster this offset falls:
         let cluster_size =
