@@ -1,7 +1,7 @@
 use crate::{error::Result, fat_table, ClusterId, SectorId, VfatFS};
 use log::debug;
 
-pub struct ClusterChainWriter {
+pub(crate) struct ClusterChainWriter {
     vfat_fs: VfatFS,
     current_cluster: ClusterId,
     current_sector: SectorId,

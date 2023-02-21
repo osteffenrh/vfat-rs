@@ -6,13 +6,13 @@ use crate::{fat_table, ArcMutex, ClusterId, Result, SectorId};
 /// this implements and encapsulates the logic needed to traverse
 /// cluster chains, by reading the FAT table.
 pub(crate) struct ClusterChainReader {
-    pub device: ArcMutex<CachedPartition>,
-    pub current_cluster: Option<ClusterId>,
+    device: ArcMutex<CachedPartition>,
+    current_cluster: Option<ClusterId>,
     pub(crate) last_cluster_read: ClusterId,
-    pub current_sector: SectorId,
+    current_sector: SectorId,
     /// Offset in current_sector. In case buf.len()%sector_size != 0, this sector is not full read.
     /// The next read call will start from this offset.
-    pub offset_byte_in_current_sector: usize,
+    offset_byte_in_current_sector: usize,
 }
 impl ClusterChainReader {
     pub(crate) fn new(device: ArcMutex<CachedPartition>, start_cluster: ClusterId) -> Self {

@@ -7,7 +7,6 @@ use log::{debug, error, info};
 use snafu::ensure;
 
 use crate::cluster::cluster_reader::ClusterChainReader;
-use crate::cluster::cluster_writer::ClusterChainWriter;
 use crate::os_interface::directory_entry::{
     unknown_entry_convert_to_bytes_2, Attributes, EntryId, RegularDirectoryEntry,
     UnknownDirectoryEntry, VfatDirectoryEntry,
@@ -15,7 +14,7 @@ use crate::os_interface::directory_entry::{
 use crate::os_interface::timestamp::VfatTimestamp;
 use crate::os_interface::{File, Metadata, VfatEntry};
 use crate::{error, Path};
-use crate::{ClusterId, SectorId, VfatFS, VfatMetadataTrait};
+use crate::{ClusterId, VfatFS, VfatMetadataTrait};
 
 // TODO: this assumes sector size
 const SECTOR_SIZE: usize = 512;
@@ -97,6 +96,7 @@ impl Directory {
             .into_directory_unchecked())
     }
 
+    /// Used to create a new file in this directory
     pub fn create(&mut self, name: String, entry_type: EntryType) -> error::Result<VfatEntry> {
         if self.contains(&name)? {
             return Err(error::VfatRsError::NameAlreadyInUse { target: name });
@@ -146,19 +146,9 @@ impl Directory {
             found_spot_start_index, entries
         );
         let spot_memory_offset = found_spot_start_index * mem::size_of::<UnknownDirectoryEntry>();
-        let offset_in_sector = spot_memory_offset % self.vfat_filesystem.device.sector_size;
-        let sector_offset = (spot_memory_offset / self.vfat_filesystem.device.sector_size) as u32;
+        let mut ccw = self.vfat_filesystem.cluster_chain_writer(cluster_id);
+        ccw.seek(spot_memory_offset)?;
 
-        let mut ccw = ClusterChainWriter::new(
-            self.vfat_filesystem.clone(),
-            cluster_id,
-            SectorId(sector_offset),
-            offset_in_sector,
-        );
-        info!(
-            "found spot: {}, offset_in_sector = {}, start_sector = {}, cluster: {}",
-            found_spot_start_index, offset_in_sector, sector_offset, cluster_id
-        );
         for unknown_entry in entries.into_iter() {
             let entry: [u8; mem::size_of::<UnknownDirectoryEntry>()] = unknown_entry.into();
             ccw.write(&entry)?;
@@ -347,7 +337,6 @@ impl Directory {
 
             for (index, dir_entry) in unknown_entries
                 .iter()
-                .map(Clone::clone)
                 .map(VfatDirectoryEntry::from)
                 .take_while(|entry| !matches!(*entry, VfatDirectoryEntry::EndOfEntries(_)))
                 .enumerate()
@@ -371,7 +360,10 @@ impl Directory {
                             regular.full_name()
                         };
                         if name == target_name {
-                            info!("Directory entry update: Found '{}'.", name);
+                            info!(
+                                "Directory entry update: Found '{}', index: {}.",
+                                name, index
+                            );
                             self.update_entry_by_index(
                                 new_entry,
                                 index,
@@ -426,24 +418,14 @@ impl Directory {
         index: usize,
         cluster: ClusterId,
     ) -> error::Result<()> {
-        let entries_per_sector =
-            self.vfat_filesystem.device.sector_size / mem::size_of::<UnknownDirectoryEntry>();
-        let containing_sector = (index as f64 / entries_per_sector as f64).floor() as u32;
-        let offset_in_sector = (index % entries_per_sector)
-            .checked_mul(mem::size_of::<UnknownDirectoryEntry>())
-            .unwrap();
-
+        let index_offset = mem::size_of::<UnknownDirectoryEntry>() * index;
         let buf: [u8; mem::size_of::<UnknownDirectoryEntry>()] = entry.into();
-
-        debug!("Update entry by index, going to update entry index: {}, in sectorId: {}, in cluster: {}, with offset_in_sector: {}",
-        index, containing_sector, self.metadata.cluster, offset_in_sector);
-
-        let mut ccw = ClusterChainWriter::new(
-            self.vfat_filesystem.clone(),
-            cluster,
-            SectorId(containing_sector),
-            offset_in_sector,
+        debug!(
+            "Update entry by index, going to update entry index: {}, cluster:{}, index_offset: {}",
+            index, self.metadata.cluster, index_offset
         );
+        let mut ccw = self.vfat_filesystem.cluster_chain_writer(cluster);
+        ccw.seek(index_offset)?;
         ccw.write(&buf)?;
         Ok(())
     }
