@@ -89,6 +89,11 @@ impl VfatEntry {
         self.is_file()
             .then(|| File::new(self.vfat_filesystem, self.metadata))
     }
+    pub fn into_file_unchecked(self) -> File {
+        self.is_file()
+            .then(|| File::new(self.vfat_filesystem, self.metadata))
+            .unwrap()
+    }
 }
 
 impl From<Directory> for VfatEntry {

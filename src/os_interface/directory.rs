@@ -41,45 +41,16 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub fn new(vfat_filesystem: VfatFS, metadata: Metadata) -> Self {
+    pub(crate) fn new(vfat_filesystem: VfatFS, metadata: Metadata) -> Self {
         Self {
             vfat_filesystem,
             metadata,
         }
     }
 
-    fn create_metadata_for_new_entry(
-        &mut self,
-        entry_name: &str,
-        entry_type: &EntryType,
-    ) -> error::Result<Metadata> {
-        let path = Path::new(format!("{}{}", self.metadata.path(), entry_name));
-        let attributes = Self::attributes_from_entry(entry_type);
-        let cluster_id = match entry_type {
-            EntryType::File => ClusterId::new(0),
-            EntryType::Directory => self.vfat_filesystem.allocate_cluster_new_entry()?,
-        };
-        info!("Going to use as cluster id: {}", cluster_id);
-        let size = 0;
-        let metadata = Metadata::new(
-            VfatTimestamp::new(0),
-            VfatTimestamp::new(0),
-            entry_name,
-            size,
-            path,
-            cluster_id,
-            self.metadata.path().clone(),
-            attributes,
-        );
-        Ok(metadata)
-    }
-}
-
-impl Directory {
-    pub(crate) fn iter(&self) -> IntoIter<VfatEntry> {
-        self.contents().unwrap().into_iter()
-    }
-    fn contains(&self, name: &str) -> error::Result<bool> {
+    /// Returns true if an entry called "name" is contained in this directory
+    ///
+    pub fn contains(&self, name: &str) -> error::Result<bool> {
         for entry in self.contents()? {
             if entry.name() == name {
                 return Ok(true);
@@ -87,22 +58,27 @@ impl Directory {
         }
         Ok(false)
     }
+    /// Create a new file in this directory
+    ///
     pub fn create_file(&mut self, name: String) -> error::Result<File> {
-        Ok(self.create(name, EntryType::File)?.into_file().unwrap())
+        Ok(self.create(name, EntryType::File)?.into_file_unchecked())
     }
+
+    /// Create a new directory in this directory
+    ///
     pub fn create_directory(&mut self, name: String) -> error::Result<Directory> {
         Ok(self
             .create(name, EntryType::Directory)?
             .into_directory_unchecked())
     }
 
-    /// Used to create a new file in this directory
-    pub fn create(&mut self, name: String, entry_type: EntryType) -> error::Result<VfatEntry> {
+    /// Used to create a new entry in this directory
+    fn create(&mut self, name: String, entry_type: EntryType) -> error::Result<VfatEntry> {
         if self.contains(&name)? {
             return Err(error::VfatRsError::NameAlreadyInUse { target: name });
         }
 
-        //1. Create metadata:
+        // 1. Create metadata:
         let metadata = self.create_metadata_for_new_entry(name.as_str(), &entry_type)?;
 
         // 2. Based on the name, create one or more LFN and the Regular entry.
@@ -111,7 +87,11 @@ impl Directory {
             metadata.cluster,
             Self::attributes_from_entry(&entry_type),
         );
+
+        // Spots needed depends on the number of directory entry we need to create. A longer
+        // file name will require more entries.
         let spots_needed = entries.len();
+
         let found = self.find_empty_spots_with_cluster(spots_needed)?;
         let (found_spot_start_index, cluster_id) = match found {
             Some(spot) => spot,
@@ -170,6 +150,38 @@ impl Directory {
         })
     }
 
+    fn create_metadata_for_new_entry(
+        &mut self,
+        entry_name: &str,
+        entry_type: &EntryType,
+    ) -> error::Result<Metadata> {
+        let path = Path::new(format!("{}{}", self.metadata.path(), entry_name));
+        let attributes = Self::attributes_from_entry(entry_type);
+        let cluster_id = match entry_type {
+            // No need to allocate a new cluster
+            EntryType::File => ClusterId::new(0),
+            // Allocate for directory
+            EntryType::Directory => self.vfat_filesystem.allocate_cluster_new_entry()?,
+        };
+        info!("Going to use as cluster id: {}", cluster_id);
+        let size = 0;
+        let metadata = Metadata::new(
+            VfatTimestamp::new(0),
+            VfatTimestamp::new(0),
+            entry_name,
+            size,
+            path,
+            cluster_id,
+            self.metadata.path().clone(),
+            attributes,
+        );
+        Ok(metadata)
+    }
+
+    pub(crate) fn iter(&self) -> error::Result<IntoIter<VfatEntry>> {
+        self.contents().map(|v| v.into_iter())
+    }
+
     /// Returns an entry from inside this directory.
     fn get_entry(&mut self, target_filename: String) -> error::Result<VfatEntry> {
         self.contents()?
@@ -216,9 +228,7 @@ impl Directory {
         let mut contents = Vec::new();
         let filter_invalid =
             |entry: &VfatDirectoryEntry| !matches!(*entry, VfatDirectoryEntry::EndOfEntries(_));
-        let mut cluster_chain_reader = self
-            .vfat_filesystem
-            .cluster_chain_reader(self.metadata.cluster);
+        let mut cluster_chain_reader = self.cluster_chain_reader();
 
         let mut entries = Vec::new();
         while cluster_chain_reader.read(&mut buf)? > 0 {
@@ -232,14 +242,22 @@ impl Directory {
                 //.take_while(filter_invalid)
                 .for_each(|entry| info!("unknown entry to vfat directory entry: {:?}", entry));
 
-            unknown_entries
-                .iter()
-                .map(VfatDirectoryEntry::from)
-                .filter(filter_invalid)
-                .for_each(|entry| {
-                    entries.push(entry);
-                })
+            entries.extend(
+                unknown_entries
+                    .iter()
+                    .map(VfatDirectoryEntry::from)
+                    .filter(filter_invalid),
+            );
         }
+
+        // create a string from a vec
+        let string_from_vec = |v: Vec<(u8, String)>| {
+            v.into_iter()
+                .map(|(_, name)| name)
+                .collect::<Vec<String>>()
+                .join("")
+        };
+
         let mut lfn_buff: Vec<(u8, String)> = Vec::new();
         for dir_entry in entries {
             info!("Found entry: {:?}", dir_entry);
@@ -253,11 +271,7 @@ impl Directory {
                 VfatDirectoryEntry::Regular(regular) => {
                     let name = if !lfn_buff.is_empty() {
                         lfn_buff.sort();
-                        let ret = lfn_buff
-                            .into_iter()
-                            .map(|(_, name)| name)
-                            .collect::<Vec<String>>()
-                            .join("");
+                        let ret = string_from_vec(lfn_buff);
                         lfn_buff = Vec::new();
                         ret
                     } else {
@@ -307,9 +321,7 @@ impl Directory {
         let regular: RegularDirectoryEntry = metadata.into();
         self.update_entry_inner(target_name, regular.into())
     }
-}
 
-impl Directory {
     fn cluster_chain_reader(&self) -> ClusterChainReader {
         self.vfat_filesystem
             .cluster_chain_reader(self.metadata.cluster)
@@ -327,6 +339,15 @@ impl Directory {
         let mut lfn_buff: Vec<(u8, String)> = Vec::new();
 
         let mut cluster_chain_reader = self.cluster_chain_reader();
+
+        // create a string from a vec
+        let string_from_vec = |v: Vec<(u8, String)>| {
+            v.into_iter()
+                .map(|(_, name)| name)
+                .collect::<Vec<String>>()
+                .join("")
+        };
+
         loop {
             if 0 == cluster_chain_reader.read(&mut buf)? {
                 info!("Cluster chain reader is over.");
@@ -348,14 +369,13 @@ impl Directory {
                     VfatDirectoryEntry::Deleted(_) => lfn_buff.clear(),
                     VfatDirectoryEntry::Regular(regular) => {
                         let name = if !lfn_buff.is_empty() {
+                            // lfn are not assumed to be created in order, hence we need to
+                            // sort using the sequence number
                             lfn_buff.sort();
-                            let ret = lfn_buff
-                                .into_iter()
-                                .map(|(_, name)| name)
-                                .collect::<Vec<String>>()
-                                .join("");
+                            let file_name = string_from_vec(lfn_buff);
+                            // prepare the buffer for the next file.
                             lfn_buff = Vec::new();
-                            ret
+                            file_name
                         } else {
                             regular.full_name()
                         };
@@ -381,6 +401,28 @@ impl Directory {
             target: target_name,
         })
     }
+
+    // Replace entry with index `index` with input `entry`.
+    pub(crate) fn update_entry_by_index(
+        &self,
+        entry: UnknownDirectoryEntry,
+        index: usize,
+        // todo: will get rid of this parameter - and use a ccw.seek instead.
+        cluster: ClusterId,
+    ) -> error::Result<()> {
+        let index_offset = mem::size_of::<UnknownDirectoryEntry>() * index;
+        let buf: [u8; mem::size_of::<UnknownDirectoryEntry>()] = entry.into();
+        debug!(
+            "Update entry by index, going to update entry index: {}, cluster:{}, index_offset: {}",
+            index, self.metadata.cluster, index_offset
+        );
+
+        let mut ccw = self.vfat_filesystem.cluster_chain_writer(cluster);
+        ccw.seek(index_offset)?;
+        ccw.write(&buf)?;
+        Ok(())
+    }
+
     fn delete_entry(&mut self, entry: VfatEntry) -> error::Result<()> {
         const SPECIAL_CURRENT_UPPER_DIRECTORY: usize = 2;
         let entry = if entry.is_dir() {
@@ -412,23 +454,6 @@ impl Directory {
         self.update_entry_inner(target_name, dir_entry)
     }
 
-    pub(crate) fn update_entry_by_index(
-        &self,
-        entry: UnknownDirectoryEntry,
-        index: usize,
-        cluster: ClusterId,
-    ) -> error::Result<()> {
-        let index_offset = mem::size_of::<UnknownDirectoryEntry>() * index;
-        let buf: [u8; mem::size_of::<UnknownDirectoryEntry>()] = entry.into();
-        debug!(
-            "Update entry by index, going to update entry index: {}, cluster:{}, index_offset: {}",
-            index, self.metadata.cluster, index_offset
-        );
-        let mut ccw = self.vfat_filesystem.cluster_chain_writer(cluster);
-        ccw.seek(index_offset)?;
-        ccw.write(&buf)?;
-        Ok(())
-    }
     /// Searches for `spots_needed` in all the clusters allocated to this directory
     /// Will return None if not enough spots were found.
     fn find_empty_spots_with_cluster(
@@ -440,9 +465,7 @@ impl Directory {
             "Going to look for a spot, starting from: {}",
             self.metadata.cluster
         );
-        let mut cluster_chain_reader = self
-            .vfat_filesystem
-            .cluster_chain_reader(self.metadata.cluster);
+        let mut cluster_chain_reader = self.cluster_chain_reader();
         let mut buff = [0u8; BUF_SIZE];
         let mut spots_found = 0;
 

@@ -209,7 +209,6 @@ impl VfatFS {
     }
 
     /// p should start with `/`.
-    /// TODO: test.
     /// Test with a path to a file, test with a path to root.
     pub fn get_path(&mut self, path: Path) -> Result<VfatEntry> {
         info!("FS: requested path: {:?}", path);
@@ -222,7 +221,7 @@ impl VfatFS {
         for sub_path in path_iter {
             info!("Visiting path: {}", sub_path);
             let directory = current_entry.into_directory_or_not_found()?;
-            let directory_iter = directory.iter();
+            let directory_iter = directory.iter()?;
             let matches: Option<VfatEntry> = directory_iter
                 .filter(|entry| {
                     info!(

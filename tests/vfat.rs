@@ -8,7 +8,7 @@ use serial_test::serial;
 
 use block_devs::FilebackedBlockDevice;
 use vfat_rs::mbr::MasterBootRecord;
-use vfat_rs::{mbr, BlockDevice, EntryType, Path, SectorId, VfatFS};
+use vfat_rs::{mbr, BlockDevice, Path, SectorId, VfatFS};
 
 mod block_devs;
 mod common;
@@ -257,13 +257,12 @@ fn test_file_write(name: &str) -> vfat_rs::Result<()> {
         .expect("File already exists. Please delete it.");
 
     // 3. create file
-    let res = root
-        .create(file_name.clone(), EntryType::File)
+    let mut as_file = root
+        .create_file(file_name.clone())
         .expect("Cannote create file");
 
     // 4. Write CONTENT to file
     const CONTENT: &[u8] = b"Hello, world! This is Vfat\n";
-    let mut as_file = res.into_file().expect("Into file");
     as_file.write_all(CONTENT).expect("write all");
 
     let mut as_file = vfat
