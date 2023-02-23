@@ -1,5 +1,3 @@
-use log::info;
-
 use crate::error::Result;
 use crate::fat_table::fat_entry::FAT_ENTRY_SIZE;
 use crate::fat_table::{get_params, FatEntry};

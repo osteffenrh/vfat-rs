@@ -92,27 +92,23 @@ impl Directory {
         // file name will require more entries.
         let spots_needed = entries.len();
 
-        let found = self.find_empty_spots_with_cluster(spots_needed)?;
-        let (found_spot_start_index, cluster_id) = match found {
-            Some(spot) => spot,
-            None => {
-                debug!(
-                    "No free spot for the new entry found in the currently available cluster. \
+        let (found_spot_start_index, enough_spots_found) =
+            self.find_empty_spots_index(spots_needed)?;
+        if !enough_spots_found {
+            debug!(
+                "No enough free spot for the new entry found in the currently available cluster. \
         Going to allocate a new one and trying again."
-                );
-                // Keep storing LFNs and entries.
-                // Apparently, we did not found any free spot in the cluster.
-                let cluster_id = self
-                    .vfat_filesystem
-                    .allocate_cluster_to_chain(self.metadata.cluster)?;
-                info!(
-                    "Cluster id: {} was successfully allocated. Going to try again now.",
-                    cluster_id
-                );
-                return self.create(name, entry_type);
-                //(0, cluster_id)
-            }
-        };
+            );
+            // Keep storing LFNs and entries.
+            // Apparently, we did not found any free spot in the cluster.
+            let cluster_id = self
+                .vfat_filesystem
+                .allocate_cluster_to_chain(self.metadata.cluster)?;
+            info!(
+                "Cluster id: {} was successfully allocated. Going to try again now.",
+                cluster_id
+            );
+        }
 
         info!(
             "Going to use as metadata: {:?}. self metadatapath= '{}', selfmetadata name = '{}'. My attributes: {:?}, cluster: {:?}",
@@ -127,7 +123,9 @@ impl Directory {
             found_spot_start_index, entries
         );
         let spot_memory_offset = found_spot_start_index * mem::size_of::<UnknownDirectoryEntry>();
-        let mut ccw = self.vfat_filesystem.cluster_chain_writer(cluster_id);
+        let mut ccw = self
+            .vfat_filesystem
+            .cluster_chain_writer(self.metadata.cluster);
         ccw.seek(spot_memory_offset)?;
 
         for unknown_entry in entries.into_iter() {
@@ -149,6 +147,44 @@ impl Directory {
             }
             EntryType::File => VfatEntry::new_file(metadata, self.vfat_filesystem.clone()),
         })
+    }
+
+    /// Searches for `spots_needed` in all the clusters allocated to this directory
+    /// it only searches for empty spots, it won't allow (for now? TODO) replacing deleted entries.
+    ///
+    /// Returns:
+    ///  usize = index of the first EndOfEntries
+    ///  bool = enough spots found, no allocation needed.
+    fn find_empty_spots_index(&self, spots_needed: usize) -> error::Result<(usize, bool)> {
+        assert!(spots_needed > 0);
+        info!(
+            "Going to look for a spot, starting from: {}",
+            self.metadata.cluster
+        );
+        let mut cluster_chain_reader = self.cluster_chain_reader();
+        let mut buff = [0u8; BUF_SIZE];
+        let mut spots_found = 0;
+        let mut start_index = None;
+        let mut global_index = 0;
+
+        while cluster_chain_reader.read(&mut buff)? > 0 {
+            let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
+                unknown_entry_convert_from_bytes_entries(buff);
+            for entry in unknown_entries.iter() {
+                if entry.is_end_of_entries() {
+                    if start_index.is_none() {
+                        start_index = Some(global_index);
+                    }
+                    spots_found += 1;
+                }
+                if spots_found == spots_needed {
+                    return Ok((start_index.unwrap(), true));
+                }
+                global_index += 1;
+            }
+            buff = [0u8; BUF_SIZE];
+        }
+        Ok((start_index.unwrap(), false))
     }
 
     fn create_metadata_for_new_entry(
@@ -432,57 +468,6 @@ impl Directory {
 
         dir_entry.set_id(EntryId::Deleted);
         self.update_entry_inner(target_name, dir_entry)
-    }
-
-    /// Searches for `spots_needed` in all the clusters allocated to this directory
-    /// Will return None if not enough spots were found.
-    fn find_empty_spots_with_cluster(
-        &self,
-        spots_needed: usize,
-    ) -> error::Result<Option<(usize, ClusterId)>> {
-        assert!(spots_needed > 0);
-        info!(
-            "Going to look for a spot, starting from: {}",
-            self.metadata.cluster
-        );
-        let mut cluster_chain_reader = self.cluster_chain_reader();
-        let mut buff = [0u8; BUF_SIZE];
-        let mut spots_found = 0;
-
-        let mut start_cluster = None;
-        let mut start_index = 0;
-
-        while cluster_chain_reader.read(&mut buff)? > 0 {
-            let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
-                unknown_entry_convert_from_bytes_entries(buff);
-            for (index, entry) in unknown_entries.iter().enumerate() {
-                if entry.last_entry() {
-                    if start_cluster.is_none() {
-                        start_cluster = Some(cluster_chain_reader.last_cluster_read);
-                        start_index = index;
-                        info!(
-                            "First empty spot found! {:?}, {}",
-                            start_cluster, start_index
-                        );
-                    }
-                    spots_found += 1;
-                } else {
-                    spots_found = 0;
-                    start_index = 0;
-                    start_cluster = None;
-                }
-                if spots_needed == spots_found {
-                    debug!(
-                        "Found empty spot: {:?}, cluster: {:?}",
-                        start_index,
-                        start_cluster.unwrap()
-                    );
-                    return Ok(Some((start_index, start_cluster.unwrap())));
-                }
-            }
-            buff = [0u8; BUF_SIZE];
-        }
-        Ok(None)
     }
 
     fn attributes_from_entry(entry: &EntryType) -> Attributes {

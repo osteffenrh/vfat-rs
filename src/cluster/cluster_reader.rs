@@ -1,5 +1,3 @@
-use log::{debug, info};
-
 use crate::cache::CachedPartition;
 use crate::{fat_table, ArcMutex, ClusterId, Result, SectorId};
 

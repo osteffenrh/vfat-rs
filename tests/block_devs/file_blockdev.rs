@@ -1,5 +1,4 @@
 use binrw::io::Write;
-use log::debug;
 use std::cmp::min;
 use std::fs::File;
 use std::io::SeekFrom;

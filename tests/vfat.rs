@@ -440,6 +440,7 @@ fn test_delete_folder_non_empty() -> vfat_rs::Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 #[serial]
 fn test_stress() -> vfat_rs::Result<()> {

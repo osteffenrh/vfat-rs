@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-use log::info;
 
 use crate::error::Result;
 use crate::fat_table::{get_params, FatEntry};
