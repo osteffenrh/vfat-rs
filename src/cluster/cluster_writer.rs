@@ -1,13 +1,14 @@
 use crate::{error::Result, fat_table, ClusterId, SectorId, VfatFS};
 use log::debug;
 
+#[derive(Debug)]
 pub(crate) struct ClusterChainWriter {
     vfat_fs: VfatFS,
-    current_cluster: ClusterId,
-    current_sector: SectorId,
+    pub(crate) current_cluster: ClusterId,
+    pub(crate) current_sector: SectorId,
     /// Offset in current_sector. In case buf.len()%sector_size != 0, this sector is not full read.
     /// The next read call will start from this offset.
-    offset_byte_in_current_sector: usize,
+    pub(crate) offset_byte_in_current_sector: usize,
 }
 
 impl ClusterChainWriter {
@@ -41,24 +42,33 @@ impl ClusterChainWriter {
     // If the offset is outside file, it will allocate clusters to accommodate requested seek size.
     /// Also: this allows seeking only forward, not backwards.
     pub fn seek(&mut self, offset: usize) -> Result<()> {
+        debug!(
+            "offset: {}, sector size: {} sectors per cluster: {}",
+            offset, self.vfat_fs.device.sector_size, self.vfat_fs.device.sectors_per_cluster
+        );
+
         // Calculate in which cluster this offset falls:
         let cluster_size =
             self.vfat_fs.device.sectors_per_cluster as usize * self.vfat_fs.device.sector_size;
         let cluster_offset = (offset as f64 / cluster_size as f64) as usize; //TODO: check it's floor()
-
+        debug!("Cluster offset: {}", cluster_offset);
         // Calculate in which sector this offset falls:
         let sector_offset = offset / self.vfat_fs.device.sector_size
             % self.vfat_fs.device.sectors_per_cluster as usize;
 
         // Finally, calculate the offset in the selected sector:
-        self.offset_byte_in_current_sector = offset % self.vfat_fs.device.sector_size;
+        let offset_in_sector = offset % self.vfat_fs.device.sector_size;
 
         for _ in 0..cluster_offset {
             self.current_cluster = self.next_cluster_alloc()?;
         }
-
+        debug!(
+            "offset in sector: {}, current cluster:{}",
+            offset_in_sector, self.current_cluster
+        );
         self.current_sector = self.vfat_fs.device.cluster_to_sector(self.current_cluster)
             + SectorId(sector_offset as u32);
+        self.offset_byte_in_current_sector = offset_in_sector;
 
         Ok(())
     }

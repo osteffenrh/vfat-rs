@@ -31,10 +31,10 @@ pub(crate) fn set_fat_entry(
 ) -> Result<()> {
     let (sector, offset) = get_params(&device, cluster_id)?;
 
-    info!(
+    /*info!(
         "Requested cid: {}, containing sector: {}, offset in sector: {}",
         cluster_id, sector, offset
-    );
+    );*/
     device.write_sector_offset(sector, offset, &entry.as_buff())?;
     Ok(())
 }

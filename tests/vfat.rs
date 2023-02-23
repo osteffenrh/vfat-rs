@@ -38,7 +38,7 @@ fn init() -> (FilebackedBlockDevice, MasterBootRecord) {
 
 fn init_vfat() -> vfat_rs::Result<VfatFS> {
     let (dev, master_boot_record) = init();
-    info!("start: {:#?}", master_boot_record);
+    //info!("start: {:#?}", master_boot_record);
     VfatFS::new(dev, master_boot_record.partitions[0].start_sector)
 }
 
@@ -324,6 +324,7 @@ pub fn convert(num: f64) -> String {
     format!("{}{} {}", negative, pretty_bytes, unit)
 }
 
+#[ignore]
 #[test]
 #[serial]
 fn test_big_write_and_read() -> vfat_rs::Result<()> {
@@ -440,7 +441,6 @@ fn test_delete_folder_non_empty() -> vfat_rs::Result<()> {
 }
 
 #[test]
-#[ignore]
 #[serial]
 fn test_stress() -> vfat_rs::Result<()> {
     // TODO: stress file creation

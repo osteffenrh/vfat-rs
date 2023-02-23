@@ -46,10 +46,10 @@ impl ClusterChainReader {
 
         // Finally, calculate the offset in the selected sector:
         let offset_in_sector = offset % self.device.sector_size;
-        info!(
+        /*info!(
             "Offset: {}, cluster_offset: {}, sector offset: {}, offset in sector: {}",
             offset, cluster_offset, sector_offset, offset_in_sector
-        );
+        );*/
         for _ in 0..cluster_offset {
             self.current_cluster = self.next_cluster()?;
         }
@@ -81,11 +81,11 @@ impl ClusterChainReader {
                 }
             }
         }
-        debug!(
+        /*debug!(
             "CRR completed, red<buf: {}, is some: {}",
             amount < buf.len(),
             self.current_cluster.is_some()
-        );
+        );*/
 
         Ok(amount)
     }

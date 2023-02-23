@@ -71,7 +71,10 @@ impl File {
         if self.metadata.cluster == ClusterId::new(0) {
             debug!("File's cluster is none.");
             self.metadata.cluster = self.vfat_filesystem.allocate_cluster_new_entry()?;
-            debug!("Allocated cluster to file: {}", self.metadata.cluster);
+            debug!(
+                "Allocated cluster to file: {}, updating metadata...",
+                self.metadata.cluster
+            );
             self.update_metadata()?;
             debug!("Updated metadata");
         }

@@ -25,12 +25,12 @@ impl BlockDevice for FilebackedBlockDevice {
         let max_read = min(buf.len(), self.sector_size());
         let mut temp_buf = vec![0; max_read];
         let final_destination = sector.0 as u64 * self.sector_size() as u64 + offset as u64;
-        debug!(
+        /*debug!(
             "Sector: {}, offset: {}, finaldest: {}",
             sector.0 as u64 * self.sector_size() as u64,
             offset,
             final_destination
-        );
+        );*/
         self.image
             .seek(SeekFrom::Start(final_destination))
             .expect("Impossible to seek to the sector");
@@ -38,7 +38,7 @@ impl BlockDevice for FilebackedBlockDevice {
         self.image
             .read_exact(temp_buf.as_mut_slice())
             .expect("Impossible to read from image");
-        debug!("done reading read_sector_offset...");
+        //debug!("done reading read_sector_offset...");
         buf.write(temp_buf.as_mut_slice()).map_err(Into::into)
     }
 
@@ -50,19 +50,19 @@ impl BlockDevice for FilebackedBlockDevice {
     ) -> vfat_rs::Result<usize> {
         use std::io::Write;
         let final_destination = sector.0 as u64 * self.sector_size() as u64 + offset as u64;
-        debug!(
+        /*debug!(
             "Seeking to : sector: {}, sector_size: {}, offset: {}, final destination: {} ",
             sector,
             self.sector_size(),
             offset,
             final_destination
-        );
+        );*/
         self.image
             .seek(SeekFrom::Start(final_destination))
             .expect("Error seek");
-        debug!("Writing the buffer to the image..");
+        //debug!("Writing the buffer to the image..");
         self.image.write_all(buf).expect("Write sector");
-        debug!("Written: {}", buf.len());
+        //debug!("Written: {}", buf.len());
         Ok(buf.len())
     }
 
