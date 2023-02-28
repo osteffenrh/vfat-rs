@@ -23,7 +23,10 @@ mod long_file_name_entry;
 mod regular_entry;
 mod unknown_entry;
 
+/// marks previous entry as last in the directory
 const ID_LAST_ENTRY_WAS_LAST: u8 = 0x00;
+
+/// marks file as deleted when in name[0]
 const ID_DELETED_UNUSED_ENTRY: u8 = 0xE5;
 
 /// The content of a directory on a disk, is a list of entries which can take form of:

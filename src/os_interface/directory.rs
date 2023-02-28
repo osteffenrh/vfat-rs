@@ -34,6 +34,10 @@ pub enum EntryType {
 }
 
 /// This is the public interface to the directory concept.
+/// A directory is composed of "DirectoryEntry" elements.
+/// The directory supports Long File Name (LFN)
+/// Externally, DirectoryEntry are converted to directory or files. Deleted elements are hidden.
+/// Every directory has two pseudo directories: "." (current directory) and ".." (parent directory)
 #[derive(Debug)]
 pub struct Directory {
     pub(crate) vfat_filesystem: VfatFS,
@@ -313,26 +317,23 @@ impl Directory {
                         regular.full_name()
                     };
 
+                    let path = Path::new(format!(
+                        "{}{name}{}",
+                        self.metadata.path(),
+                        if regular.is_dir() { "/" } else { "" }
+                    ));
+
                     let metadata = Metadata::new(
                         regular.creation_time,
                         regular.last_modification_time,
-                        name.clone(),
+                        name,
                         regular.file_size,
-                        Path::new(format!(
-                            "{}{name}{}",
-                            self.metadata.path(),
-                            if regular.is_dir() { "/" } else { "" }
-                        )),
+                        path,
                         regular.cluster(),
                         self.metadata.path().clone(),
                         regular.attributes,
                     );
-                    info!(
-                        "dir_entry: name: {name:?} - ClusterID: {}, file size: {}",
-                        metadata.cluster,
-                        metadata.size,
-                        name = name.trim_end(),
-                    );
+
                     info!("Metadata: {:?}", metadata);
 
                     let new_fn = if regular.is_dir() {
@@ -342,7 +343,6 @@ impl Directory {
                     };
 
                     contents.push(new_fn(metadata, self.vfat_filesystem.clone()));
-                    //info!("New contents: {:?}", contents);
                 }
                 // The for loop stops on EndOfEntries
                 VfatDirectoryEntry::EndOfEntries(_) => {
@@ -378,7 +378,7 @@ impl Directory {
             .join("")
     }
 
-    // TODO: Currently this doesn't support renaming file, just updating metadatas...
+    // TODO: Currently this doesn't support renaming file, just updating/replacing metadatas...
     fn update_entry_inner(
         &mut self,
         target_name: String,
