@@ -2,7 +2,7 @@
 A simple VFAT implementation written in rust, and mostly tested against Linux's vfat driver.
 
 ## no_std
-This component was first developed with no_std in mind. `std` is still not yet supported but coming soon.
+This component was first developed with no_std in mind. `std` is still not yet supported.
 
 ## Run example
 to run the example, first create a vfat fs using tests/setup.sh, then run the example file using:

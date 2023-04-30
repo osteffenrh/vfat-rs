@@ -3,9 +3,9 @@ use alloc::string::String;
 use core::fmt;
 use core::fmt::{Debug, Formatter};
 
-use crate::os_interface::directory_entry::{Attributes, VfatDirectoryEntry};
-use crate::os_interface::timestamp::{Milliseconds, VfatTimestamp};
-use crate::os_interface::Metadata;
+use crate::api::directory_entry::{Attributes, VfatDirectoryEntry};
+use crate::api::timestamp::{Milliseconds, VfatTimestamp};
+use crate::api::Metadata;
 use crate::{const_assert_size, ClusterId};
 
 #[derive(Copy, Clone)]

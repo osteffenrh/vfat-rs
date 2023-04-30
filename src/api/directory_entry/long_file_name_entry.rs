@@ -1,6 +1,6 @@
+use crate::api::directory_entry::Attributes;
 use crate::const_assert_size;
 use crate::defbit;
-use crate::os_interface::directory_entry::Attributes;
 use alloc::string::String;
 use core::fmt;
 use core::fmt::{Debug, Formatter};

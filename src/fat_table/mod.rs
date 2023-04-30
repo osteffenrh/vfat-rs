@@ -17,13 +17,14 @@ fn get_params(device: &CachedPartition, cluster_id: ClusterId) -> error::Result<
     // this should be 512 / 32 = 18
     let fat_entries_per_sector = device.sector_size / FAT_ENTRY_SIZE;
     // In which sector is this cid contained. Cid: 222 / 18 = 12.3333
-    //TODO: check floor
-    let containing_sector = (f64::from(cluster_id) / fat_entries_per_sector as f64) as u32;
+
+    let containing_sector = (f64::from(cluster_id) / fat_entries_per_sector as f64).floor() as u32;
     // The sector is 12, now let's calculate the offset in that sector: 222 % 18 = 6.
-    // TODO: check floor
-    let offset_in_sector = ((f64::from(cluster_id) % fat_entries_per_sector as f64) as usize)
+
+    let offset_in_sector = ((f64::from(cluster_id) % fat_entries_per_sector as f64).floor()
+        as usize)
         .checked_mul(FAT_ENTRY_SIZE)
-        .ok_or(CheckedMulFailed)?; //Todo: make nicer.
+        .ok_or(CheckedMulFailed)?;
 
     let sector = SectorId(device.fat_start_sector + containing_sector);
 

@@ -212,20 +212,20 @@ impl VfatFS {
     /// Test with a path to a file, test with a path to root.
     pub fn get_path(&mut self, path: Path) -> Result<VfatEntry> {
         info!("FS: requested path: {:?}", path);
-        if path == Path::new("/") {
+        if path == Path::from("/") {
             return self.get_root().map(From::from);
         }
-        let mut path_iter = path.as_parts();
+        let mut path_iter = path.iter();
         let mut current_entry = VfatEntry::from(self.get_root()?);
         path_iter.next();
         for sub_path in path_iter {
-            info!("Visiting path: {}", sub_path);
+            info!("Visiting path: {:?}", sub_path);
             let directory = current_entry.into_directory_or_not_found()?;
             let directory_iter = directory.iter()?;
             let matches: Option<VfatEntry> = directory_iter
                 .filter(|entry| {
                     info!(
-                        "Entry name: {}, looking for sub_path: {}",
+                        "Entry name: {:?}, looking for sub_path: {:?}",
                         entry.metadata().name(),
                         sub_path
                     );
@@ -233,8 +233,11 @@ impl VfatFS {
                 })
                 .last();
             current_entry = matches.ok_or_else(|| {
-                info!("Matches for {} is empty: path not found!", sub_path);
+                info!("Matches for {:?} is empty: path not found!", sub_path);
                 VfatRsError::EntryNotFound {
+                    #[cfg(feature = "std")]
+                    target: sub_path.to_str().unwrap().into(),
+                    #[cfg(not(feature = "std"))]
                     target: sub_path.into(),
                 }
             })?;
@@ -269,9 +272,9 @@ impl VfatFS {
             volume_id.last_modification_time,
             "/",
             mem::size_of::<RegularDirectoryEntry>() as u32,
-            Path::new("/"),
+            Path::from("/"),
             self.root_cluster,
-            Path::new(""),
+            Path::from(""),
             Attributes::new_directory(),
         );
         Ok(Directory::new(self.clone(), metadata))

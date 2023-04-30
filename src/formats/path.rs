@@ -1,4 +1,5 @@
 use alloc::string::String;
+use core::iter;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct Path(pub String);
@@ -7,11 +8,14 @@ impl Path {
     pub fn new<S: AsRef<str>>(path: S) -> Self {
         Self(String::from(path.as_ref()))
     }
-    pub fn as_parts(&self) -> impl Iterator<Item = &str> {
-        self.0.split_terminator('/')
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        iter::once("/").chain(self.0[1..].split_terminator('/'))
     }
     pub fn to_str(&self) -> &str {
         self.0.as_str()
+    }
+    pub fn display(&self) -> &str {
+        self.to_str()
     }
 }
 impl core::fmt::Display for Path {

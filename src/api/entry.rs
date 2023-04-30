@@ -1,5 +1,5 @@
-use crate::os_interface::timestamp::VfatTimestamp;
-use crate::os_interface::{Directory, File, Metadata};
+use crate::api::timestamp::VfatTimestamp;
+use crate::api::{Directory, File, Metadata};
 use crate::{Result, VfatFS};
 
 /// This is a library's user interface. Each directory can contain either a File or a Directory.

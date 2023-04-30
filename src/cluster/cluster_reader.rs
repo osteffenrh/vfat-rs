@@ -6,7 +6,6 @@ use crate::{fat_table, ArcMutex, ClusterId, Result, SectorId};
 pub(crate) struct ClusterChainReader {
     device: ArcMutex<CachedPartition>,
     current_cluster: Option<ClusterId>,
-    pub(crate) last_cluster_read: ClusterId,
     current_sector: SectorId,
     /// Offset in current_sector. In case buf.len()%sector_size != 0, this sector is not full read.
     /// The next read call will start from this offset.
@@ -20,7 +19,6 @@ impl ClusterChainReader {
             current_cluster: Some(start_cluster),
             offset_byte_in_current_sector: 0,
             current_sector,
-            last_cluster_read: start_cluster,
             device,
         }
     }
@@ -36,7 +34,7 @@ impl ClusterChainReader {
     pub fn seek(&mut self, offset: usize) -> Result<()> {
         // Calculate in which cluster this offset falls:
         let cluster_size = self.device.sectors_per_cluster as usize * self.device.sector_size;
-        let cluster_offset = (offset as f64 / cluster_size as f64) as usize; // TODO: check if it's going to floor. apparently floor was removed from core?!
+        let cluster_offset = (offset as f64 / cluster_size as f64).floor() as usize;
 
         // Calculate in which sector this offset falls:
         let sector_offset =
@@ -66,8 +64,6 @@ impl ClusterChainReader {
 
         let mut amount = 0;
         while amount < buf.len() && self.current_cluster.is_some() {
-            // TODO: to allow tracking of last written cluster from external user of this struct
-            self.last_cluster_read = self.current_cluster.unwrap();
             let current_amount_read = self.read_cluster(&mut buf[amount..])?;
             amount += current_amount_read;
             if current_amount_read == 0 {

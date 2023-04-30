@@ -13,19 +13,24 @@ extern crate core;
 
 use alloc::sync::Arc;
 
+use api::directory_entry::{
+    Attributes, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
+};
+pub use api::EntryType;
+pub use api::{Directory, Metadata, VfatEntry, VfatMetadataTrait};
 pub(crate) use cache::CachedPartition;
 pub use device::BlockDevice;
 pub use error::{Result, VfatRsError};
 pub(crate) use formats::cluster_id::ClusterId;
+#[cfg(not(feature = "std"))]
 pub use formats::path::Path;
+#[cfg(feature = "std")]
+pub use std::path::PathBuf as Path;
+
 pub use formats::sector_id::SectorId;
-use os_interface::directory_entry::{
-    Attributes, RegularDirectoryEntry, UnknownDirectoryEntry, VfatDirectoryEntry,
-};
-pub use os_interface::EntryType;
-pub use os_interface::{Directory, Metadata, VfatEntry, VfatMetadataTrait};
 pub use vfat::VfatFS;
 
+mod api;
 mod cache;
 mod cluster;
 mod device;
@@ -36,7 +41,6 @@ mod formats;
 mod macros;
 /// A simple Master Booot Record implementation
 pub mod mbr;
-mod os_interface;
 mod vfat;
 
 const EBPF_VFAT_MAGIC: u8 = 0x28;

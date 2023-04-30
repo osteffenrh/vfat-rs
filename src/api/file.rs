@@ -4,7 +4,7 @@ use core::{cmp, fmt};
 
 use log::{debug, info};
 
-use crate::os_interface::Metadata;
+use crate::api::Metadata;
 use crate::{error, ClusterId, Result, VfatFS};
 
 /// A File representation in a VfatFilesystem.

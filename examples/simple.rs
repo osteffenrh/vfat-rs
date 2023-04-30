@@ -47,7 +47,7 @@ fn main() {
     let to_write = b"Hello, world!";
     file.write(to_write).unwrap();
     let mut buf = [0u8; 13];
-    // TODO: is seek usually needed?
+
     file.seek(SeekFrom::Start(0)).unwrap();
 
     file.read(&mut buf).unwrap();

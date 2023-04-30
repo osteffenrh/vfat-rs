@@ -6,13 +6,13 @@ use core::mem;
 use log::{debug, error, info};
 use snafu::ensure;
 
-use crate::cluster::cluster_reader::ClusterChainReader;
-use crate::os_interface::directory_entry::{
+use crate::api::directory_entry::{
     unknown_entry_convert_to_bytes_2, Attributes, EntryId, RegularDirectoryEntry,
     UnknownDirectoryEntry, VfatDirectoryEntry,
 };
-use crate::os_interface::timestamp::VfatTimestamp;
-use crate::os_interface::{File, Metadata, VfatEntry};
+use crate::api::timestamp::VfatTimestamp;
+use crate::api::{File, Metadata, VfatEntry};
+use crate::cluster::cluster_reader::ClusterChainReader;
 use crate::{error, Path};
 use crate::{ClusterId, VfatFS, VfatMetadataTrait};
 
@@ -117,7 +117,7 @@ impl Directory {
         info!(
             "Going to use as metadata: {:?}. self metadatapath= '{}', selfmetadata name = '{}'. My attributes: {:?}, cluster: {:?}",
             metadata,
-            self.metadata.path(),
+            self.metadata.path().display(),
             self.metadata.name(),
             self.metadata.attributes,
             self.metadata.cluster
@@ -196,7 +196,7 @@ impl Directory {
         entry_name: &str,
         entry_type: &EntryType,
     ) -> error::Result<Metadata> {
-        let path = Path::new(format!("{}{}", self.metadata.path(), entry_name));
+        let path = Path::from(format!("{}{}", self.metadata.path().display(), entry_name));
         let attributes = Self::attributes_from_entry(entry_type);
         let cluster_id = match entry_type {
             // No need to allocate a new cluster
@@ -317,9 +317,9 @@ impl Directory {
                         regular.full_name()
                     };
 
-                    let path = Path::new(format!(
+                    let path = Path::from(format!(
                         "{}{name}{}",
-                        self.metadata.path(),
+                        self.metadata.path().display(),
                         if regular.is_dir() { "/" } else { "" }
                     ));
 
@@ -482,7 +482,7 @@ impl Directory {
 mod test {
     extern crate std;
 
-    use crate::os_interface::directory_entry::EntryId;
+    use crate::api::directory_entry::EntryId;
 
     #[test]
     fn valid_entry_id() {

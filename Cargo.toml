@@ -10,6 +10,7 @@ edition = "2021"
 opt-level = 2
 
 [features]
+default = []
 std = []
 
 [dependencies]
@@ -23,7 +24,7 @@ spin = "0.9.4"
 [dev-dependencies]
 env_logger = "~0.10"
 rand = "~0.8"
-serial_test = "~1.0"
+serial_test = "~2.0"
 lazy_static = "~1.4"
 chrono = "~0.4"
 

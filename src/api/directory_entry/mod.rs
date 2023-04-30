@@ -9,13 +9,11 @@ use core::iter;
 use log::{debug, info};
 use regex::Regex;
 
-pub use crate::os_interface::directory_entry::formats::{attribute, Attributes, EntryId};
-use crate::os_interface::directory_entry::long_file_name_entry::{
-    LongFileNameEntry, SequenceNumber,
-};
-pub use crate::os_interface::directory_entry::regular_entry::RegularDirectoryEntry;
-pub use crate::os_interface::directory_entry::unknown_entry::*;
-use crate::os_interface::timestamp::VfatTimestamp;
+pub use crate::api::directory_entry::formats::{attribute, Attributes, EntryId};
+use crate::api::directory_entry::long_file_name_entry::{LongFileNameEntry, SequenceNumber};
+pub use crate::api::directory_entry::regular_entry::RegularDirectoryEntry;
+pub use crate::api::directory_entry::unknown_entry::*;
+use crate::api::timestamp::VfatTimestamp;
 use crate::ClusterId;
 
 mod formats;
@@ -174,6 +172,8 @@ impl VfatDirectoryEntry {
         regular_filename[4] = b'1';
         regular_filename
     }
+
+    /// Returns the extension (if any) with padding characters
     fn get_regular_filename_ext(name: &str) -> [u8; 3] {
         let mut ext: [u8; 3] = [PADDING_CHARACTER; 3];
 
@@ -192,6 +192,7 @@ impl VfatDirectoryEntry {
         }
         ext
     }
+
     /// As seen in: https://www.kernel.org/doc/html/latest/filesystems/vfat.html
     /// The checksum is calculated from the 8.3 name using the following algorithm:
     /// ```c
@@ -340,8 +341,8 @@ impl<const T: usize> ToUtf16<T> for &str {
 mod test {
     extern crate std;
 
-    use crate::os_interface::directory_entry::formats::Attributes;
-    use crate::os_interface::directory_entry::{
+    use crate::api::directory_entry::formats::Attributes;
+    use crate::api::directory_entry::{
         LongFileNameEntry, RegularDirectoryEntry, VfatDirectoryEntry,
     };
     use crate::ClusterId;
