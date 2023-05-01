@@ -1,7 +1,5 @@
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Seek};
-
-use binrw::io::SeekFrom;
+use std::fs::OpenOptions;
+use std::io::SeekFrom;
 
 use vfat_rs::mbr::MasterBootRecord;
 use vfat_rs::{BlockDevice, FilebackedBlockDevice, SectorId, VfatFS, VfatMetadataTrait};
