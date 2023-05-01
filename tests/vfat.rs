@@ -190,10 +190,29 @@ fn test_get_path() -> vfat_rs::Result<()> {
 }
 #[test]
 #[serial]
-#[ignore]
 fn test_list_directory() -> vfat_rs::Result<()> {
-    //TODO: test directory listing
-    //unimplemented!()
+    use vfat_rs::VfatMetadataTrait;
+
+    let mut vfat = init_vfat()?;
+    assert_eq!(
+        vfat.get_root()?
+            .contents()?
+            .into_iter()
+            .map(|entry| entry.name().to_string())
+            .collect::<Vec<String>>(),
+        vec![
+            "IRISVOL",
+            "folder",
+            "MyFoLdEr",
+            "a-big-file.txt",
+            "a-very-long-file-name-entry.txt",
+            "hello.txt"
+        ]
+        .into_iter()
+        .map(Into::into)
+        .collect::<Vec<String>>()
+    );
+
     Ok(())
 }
 

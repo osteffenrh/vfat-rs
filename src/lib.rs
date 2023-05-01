@@ -1,6 +1,5 @@
 //! ntfs-rs is a simple ntfs implementation in Rust.
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
-#![deny(unaligned_references)]
 //#![deny(missing_docs)]
 //#![deny(unsafe_code)]
 // to remove:
