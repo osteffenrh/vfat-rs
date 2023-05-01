@@ -2,8 +2,18 @@ use std::fs::OpenOptions;
 use std::io::SeekFrom;
 
 use vfat_rs::mbr::MasterBootRecord;
-use vfat_rs::{BlockDevice, FilebackedBlockDevice, SectorId, VfatFS, VfatMetadataTrait};
+use vfat_rs::{BlockDevice, FilebackedBlockDevice, SectorId, VfatEntry, VfatFS, VfatMetadataTrait};
 
+fn print_contents(contents: vfat_rs::Result<Vec<VfatEntry>>) {
+    println!(
+        "Root directory content: {:?}",
+        contents
+            .unwrap()
+            .into_iter()
+            .map(|f| f.name().to_string())
+            .collect::<Vec<_>>()
+    );
+}
 fn main() {
     // to enable logging:
     // use env_logger::Env;
@@ -23,39 +33,24 @@ fn main() {
     let master_boot_record = MasterBootRecord::from(buf);
     let mut vfat_fs = VfatFS::new(fbd, master_boot_record.partitions[0].start_sector).unwrap();
     let mut root = vfat_fs.get_root().unwrap();
-    let contents = root.contents().unwrap();
-    println!(
-        "Content: {:?}",
-        contents
-            .into_iter()
-            .map(|f| f.name().to_string())
-            .collect::<Vec<_>>()
-    );
+    print_contents(root.contents());
+    println!("Creating file 'my-file'");
     let mut file = root.create_file("my-file".to_string()).unwrap();
-    let contents = root.contents().unwrap();
-    println!(
-        "Content: {:?}",
-        contents
-            .into_iter()
-            .map(|f| f.name().to_string())
-            .collect::<Vec<_>>()
-    );
-    let to_write = b"Hello, world!";
-    file.write(to_write).unwrap();
-    let mut buf = [0u8; 13];
 
+    print_contents(root.contents());
+
+    println!("Writing some text to the file");
+    file.write(b"Hello, world!").unwrap();
+
+    println!("Done, no reading it back");
     file.seek(SeekFrom::Start(0)).unwrap();
-
+    let mut buf = [0u8; 13];
     file.read(&mut buf).unwrap();
     println!("The file contains: '{}'", String::from_utf8_lossy(&buf));
+
+    println!("Deleting now...");
     root.delete("my-file".to_string()).unwrap();
     println!("File was deleted!");
-    let contents = root.contents().unwrap();
-    println!(
-        "Content: {:?}",
-        contents
-            .into_iter()
-            .map(|f| f.name().to_string())
-            .collect::<Vec<_>>()
-    );
+
+    print_contents(root.contents());
 }
