@@ -91,27 +91,7 @@ impl Directory {
             Self::attributes_from_entry(&entry_type),
         );
 
-        // Spots needed depends on the number of directory entry we need to create. A longer
-        // file name will require more entries.
-        let spots_needed = entries.len();
-
-        let (found_spot_start_index, enough_spots_found) =
-            self.find_empty_spots_index(spots_needed)?;
-        if !enough_spots_found {
-            debug!(
-                "No enough free spot for the new entry found in the currently available cluster. \
-        Going to allocate a new one and trying again."
-            );
-            // Keep storing LFNs and entries.
-            // Apparently, we did not found any free spot in the cluster.
-            let cluster_id = self
-                .vfat_filesystem
-                .allocate_cluster_to_chain(self.metadata.cluster)?;
-            info!(
-                "Cluster id: {} was successfully allocated. Going to try again now.",
-                cluster_id
-            );
-        }
+        let first_empty_spot_offset = self.find_first_empty_spot_offset()?;
 
         info!(
             "Going to use as metadata: {:?}. self metadatapath= '{}', selfmetadata name = '{}'. My attributes: {:?}, cluster: {:?}",
@@ -122,14 +102,14 @@ impl Directory {
             self.metadata.cluster
         );
         info!(
-            "Found spot: {}, Going to append entries: {:?}",
-            found_spot_start_index, entries
+            "Found spot: {:?}, Going to append entries: {:?}",
+            first_empty_spot_offset, entries
         );
-        let spot_memory_offset = found_spot_start_index * mem::size_of::<UnknownDirectoryEntry>();
+
         let mut ccw = self
             .vfat_filesystem
             .cluster_chain_writer(self.metadata.cluster);
-        ccw.seek(spot_memory_offset)?;
+        ccw.seek(first_empty_spot_offset)?;
 
         for unknown_entry in entries.into_iter() {
             let entry: [u8; mem::size_of::<UnknownDirectoryEntry>()] = unknown_entry.into();
@@ -158,36 +138,23 @@ impl Directory {
     /// Returns:
     ///  usize = index of the first EndOfEntries
     ///  bool = enough spots found, no allocation needed.
-    fn find_empty_spots_index(&self, spots_needed: usize) -> error::Result<(usize, bool)> {
-        assert!(spots_needed > 0);
-        info!(
-            "Going to look for a spot, starting from: {}",
-            self.metadata.cluster
-        );
+    fn find_first_empty_spot_offset(&self) -> error::Result<usize> {
         let mut cluster_chain_reader = self.cluster_chain_reader();
         let mut buff = [0u8; BUF_SIZE];
-        let mut spots_found = 0;
-        let mut start_index = None;
-        let mut global_index = 0;
-
+        let mut offset = 0;
         while cluster_chain_reader.read(&mut buff)? > 0 {
             let unknown_entries: [UnknownDirectoryEntry; ENTRIES_AMOUNT] =
                 unknown_entry_convert_from_bytes_entries(buff);
             for entry in unknown_entries.iter() {
                 if entry.is_end_of_entries() {
-                    if start_index.is_none() {
-                        start_index = Some(global_index);
-                    }
-                    spots_found += 1;
+                    return Ok(offset);
                 }
-                if spots_found == spots_needed {
-                    return Ok((start_index.unwrap(), true));
-                }
-                global_index += 1;
+                offset += mem::size_of::<UnknownDirectoryEntry>();
             }
             buff = [0u8; BUF_SIZE];
         }
-        Ok((start_index.unwrap(), false))
+        // we navigated the full cluster, but it's fully used.
+        Ok(offset)
     }
 
     fn create_metadata_for_new_entry(
