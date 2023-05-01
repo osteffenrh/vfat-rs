@@ -41,6 +41,8 @@ pub enum EntryType {
 pub struct Directory {
     pub(crate) vfat_filesystem: VfatFS,
     pub metadata: Metadata,
+    // An optimization, if we already created an entry, we know the offset of the last position.
+    last_entry_spot: Option<usize>,
 }
 
 impl Directory {
@@ -48,6 +50,7 @@ impl Directory {
         Self {
             vfat_filesystem,
             metadata,
+            last_entry_spot: None,
         }
     }
 
@@ -90,8 +93,12 @@ impl Directory {
             metadata.cluster,
             Self::attributes_from_entry(&entry_type),
         );
-
-        let first_empty_spot_offset = self.find_first_empty_spot_offset()?;
+        let entries_len = entries.len();
+        let first_empty_spot_offset = if self.last_entry_spot.is_none() {
+            self.find_first_empty_spot_offset()?
+        } else {
+            self.last_entry_spot.unwrap()
+        };
 
         info!(
             "Going to use as metadata: {:?}. self metadatapath= '{}', selfmetadata name = '{}'. My attributes: {:?}, cluster: {:?}",
@@ -123,6 +130,9 @@ impl Directory {
             let buf = unknown_entry_convert_to_bytes_2(entries);
             cw.write(&buf)?;
         }
+        // finally, update entries:
+        self.last_entry_spot =
+            Some(first_empty_spot_offset + entries_len * mem::size_of::<UnknownDirectoryEntry>());
 
         Ok(match entry_type {
             EntryType::Directory => {

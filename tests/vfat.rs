@@ -274,6 +274,8 @@ fn test_multiple_file_creation() -> vfat_rs::Result<()> {
 
     let mut vfat = init_vfat()?;
     let mut root = vfat.get_root()?;
+
+    // todo: if I use 1000 instead of 100, it's not able to complete due to Ram constraints O_o
     let mut files = (0..100)
         .map(|_| random_name("test_multiple_file_creation"))
         .collect::<Vec<(String, String)>>();
