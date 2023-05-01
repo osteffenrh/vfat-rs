@@ -1,4 +1,4 @@
-use binrw::io::{SeekFrom, Write};
+use crate::io::{SeekFrom, Write};
 use core::fmt::Formatter;
 use core::{cmp, fmt};
 
@@ -110,8 +110,8 @@ impl File {
             }
             SeekFrom::End(val) => {
                 if self.metadata.size as i64 + val < 0 {
-                    return Err(binrw::io::Error::new(
-                        binrw::io::ErrorKind::InvalidInput,
+                    return Err(crate::io::Error::new(
+                        crate::io::ErrorKind::InvalidInput,
                         "Invalid argument - offset cannot be less then zero.",
                     )
                     .into());
@@ -124,8 +124,8 @@ impl File {
             }
             SeekFrom::Current(val) => {
                 if self.offset as i64 + val < 0 {
-                    return Err(binrw::io::Error::new(
-                        binrw::io::ErrorKind::InvalidInput,
+                    return Err(crate::io::Error::new(
+                        crate::io::ErrorKind::InvalidInput,
                         "Invalid argument - offset cannot be less then zero.",
                     )
                     .into());
@@ -170,11 +170,11 @@ impl File {
 }
 
 impl Write for File {
-    fn write(&mut self, buf: &[u8]) -> binrw::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> crate::io::Result<usize> {
         Ok(self.write(buf)?)
     }
 
-    fn flush(&mut self) -> binrw::io::Result<()> {
+    fn flush(&mut self) -> crate::io::Result<()> {
         Ok(self.flush()?)
     }
 }

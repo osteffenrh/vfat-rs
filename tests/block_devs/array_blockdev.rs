@@ -1,4 +1,4 @@
-use binrw::io::Write;
+use vfat_rs::io::Write;
 use vfat_rs::BlockDevice;
 use vfat_rs::SectorId;
 

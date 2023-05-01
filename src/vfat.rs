@@ -285,7 +285,7 @@ impl VfatFS {
 mod test {
     use std::sync::Arc;
 
-    use binrw::io::Write;
+    use crate::io::Write;
 
     use crate::fat_table::FAT_ENTRY_SIZE;
     use crate::{BlockDevice, CachedPartition, ClusterId, Result, SectorId, VfatFS};

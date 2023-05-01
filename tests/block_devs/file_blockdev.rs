@@ -1,8 +1,8 @@
-use binrw::io::Write;
 use std::cmp::min;
 use std::fs::File;
 use std::io::SeekFrom;
 use std::io::{Read, Seek};
+use vfat_rs::io::Write;
 use vfat_rs::BlockDevice;
 use vfat_rs::SectorId;
 

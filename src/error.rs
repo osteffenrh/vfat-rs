@@ -3,6 +3,7 @@ use snafu::prelude::*;
 
 /// VfatRS result type
 pub type Result<T> = core::result::Result<T, VfatRsError>;
+use crate::io::Error as IoError;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -15,8 +16,8 @@ pub enum VfatRsError {
     CheckedMulFailed,
     #[snafu(display("An entry (file/directory) named '{}' already exists.", target))]
     NameAlreadyInUse { target: String },
-    #[snafu(display("BinRW Error: {}", source))]
-    BinRwError { source: BinRwErrorWrapper },
+    #[snafu(display("Io Error: {}", source))]
+    IoError { source: IoError },
     #[snafu(display("Unsupported vfat partition found, signature: {}", target))]
     InvalidVfat { target: u8 },
     #[snafu(display("Impossible delete non empty directory: {}", target))]
@@ -29,27 +30,15 @@ pub enum VfatRsError {
     CannotDeletePseudoDir { target: String },
 }
 
-// Needed because BinRw doesn't have the Snafu impl.
-#[derive(Debug, Snafu)]
-#[snafu(display("{value}"))]
-pub struct BinRwErrorWrapper {
-    pub(crate) value: binrw::error::Error,
-}
-impl From<binrw::error::Error> for VfatRsError {
-    fn from(err: binrw::Error) -> Self {
-        VfatRsError::BinRwError {
-            source: BinRwErrorWrapper { value: err },
-        }
+impl From<IoError> for VfatRsError {
+    fn from(err: IoError) -> Self {
+        VfatRsError::IoError { source: err }
     }
 }
-impl From<binrw::io::Error> for VfatRsError {
-    fn from(value: binrw::io::Error) -> Self {
-        VfatRsError::from(binrw::Error::from(value))
-    }
-}
-impl From<binrw::io::ErrorKind> for VfatRsError {
-    fn from(value: binrw::io::ErrorKind) -> Self {
-        VfatRsError::from(binrw::io::Error::from(value))
+
+impl From<crate::io::ErrorKind> for VfatRsError {
+    fn from(value: crate::io::ErrorKind) -> Self {
+        VfatRsError::from(crate::io::Error::from(value))
     }
 }
 
@@ -64,5 +53,26 @@ impl From<VfatRsError> for binrw::io::Error {
     fn from(_err: VfatRsError) -> Self {
         // TODO: provide useful output
         binrw::io::ErrorKind::Other.into()
+    }
+}
+
+impl From<binrw::Error> for VfatRsError {
+    fn from(err: binrw::Error) -> Self {
+        // todo
+        let kind = crate::io::ErrorKind::Other;
+        match err {
+            binrw::Error::Io(_err) => Self::from(IoError::new(kind, "IoError")),
+            _ => {
+                panic!("todo.")
+            }
+        }
+    }
+}
+#[cfg(not(feature = "std"))]
+impl From<binrw::io::Error> for VfatRsError {
+    fn from(_err: binrw::io::Error) -> Self {
+        // todo
+        let kind = crate::io::ErrorKind::Other;
+        Self::from(IoError::new(kind, "IoError"))
     }
 }

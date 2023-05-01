@@ -1,6 +1,6 @@
-use binrw::io::{SeekFrom, Write};
 use chrono::{DateTime, Datelike, Local};
 use std::fs::OpenOptions;
+use vfat_rs::io::{SeekFrom, Write};
 
 use log::info;
 use rand::Rng;
@@ -158,19 +158,12 @@ fn test_path() {
     #[cfg(feature = "std")]
     let path_str = path
         .iter()
-        .map(|el| {
-            println!("el.tostR:{}", el.to_str().unwrap());
-            el.to_str().unwrap()
-        })
+        .map(|el| el.to_str().unwrap())
         .collect::<Vec<&str>>()
         .join("/");
 
     #[cfg(not(feature = "std"))]
-    let path_str = path
-        .iter()
-        .inspect(|el| println!("el.tostR:{}", el))
-        .collect::<Vec<&str>>()
-        .join("/");
+    let path_str = path.iter().collect::<Vec<&str>>().join("/");
     assert_eq!(expected, path_str);
 }
 

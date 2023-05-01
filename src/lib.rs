@@ -20,6 +20,8 @@ pub use api::EntryType;
 pub use api::{Directory, Metadata, VfatEntry, VfatMetadataTrait};
 pub(crate) use cache::CachedPartition;
 pub use device::BlockDevice;
+#[cfg(feature = "std")]
+pub use device::FilebackedBlockDevice;
 pub use error::{Result, VfatRsError};
 pub(crate) use formats::cluster_id::ClusterId;
 #[cfg(not(feature = "std"))]
@@ -38,6 +40,7 @@ mod device;
 mod error;
 mod fat_table;
 mod formats;
+pub mod io;
 mod macros;
 /// A simple Master Booot Record implementation
 pub mod mbr;
