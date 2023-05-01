@@ -10,7 +10,6 @@ use crate::api::directory_entry::{
     unknown_entry_convert_to_bytes_2, Attributes, EntryId, RegularDirectoryEntry,
     UnknownDirectoryEntry, VfatDirectoryEntry,
 };
-use crate::api::timestamp::VfatTimestamp;
 use crate::api::{File, Metadata, VfatEntry};
 use crate::cluster::cluster_reader::ClusterChainReader;
 use crate::{error, Path};
@@ -207,8 +206,12 @@ impl Directory {
         info!("Going to use as cluster id: {}", cluster_id);
         let size = 0;
         let metadata = Metadata::new(
-            VfatTimestamp::new(0),
-            VfatTimestamp::new(0),
+            self.vfat_filesystem
+                .time_manager
+                .get_current_vfat_timestamp(),
+            self.vfat_filesystem
+                .time_manager
+                .get_current_vfat_timestamp(),
             entry_name,
             size,
             path,

@@ -9,13 +9,13 @@ use crate::cluster::{cluster_reader, cluster_writer};
 use crate::fat_table::FatEntry;
 use crate::fat_table::FAT_ENTRY_SIZE;
 use crate::formats::extended_bios_parameter_block::FullExtendedBIOSParameterBlock;
-use crate::Path;
 use crate::Result;
 use crate::{
     fat_table, ArcMutex, Attributes, BlockDevice, CachedPartition, ClusterId, Directory, Metadata,
     RegularDirectoryEntry, SectorId, UnknownDirectoryEntry, VfatDirectoryEntry, VfatEntry,
     VfatRsError, EBPF_VFAT_MAGIC, EBPF_VFAT_MAGIC_ALT,
 };
+use crate::{Path, TimeManagerNoop, TimeManagerTrait};
 
 #[derive(Clone)]
 pub struct VfatFS {
@@ -30,6 +30,8 @@ pub struct VfatFS {
     pub(crate) root_cluster: ClusterId,
     /// End of chain marker
     pub(crate) eoc_marker: FatEntry,
+    // heap allocated to mostly to ease api
+    pub(crate) time_manager: Arc<dyn TimeManagerTrait>,
 }
 
 impl fmt::Debug for VfatFS {
@@ -39,15 +41,34 @@ impl fmt::Debug for VfatFS {
 }
 
 impl VfatFS {
+    #[cfg(not(feature = "std"))]
     pub fn new<B: BlockDevice + 'static>(
-        mut device: B,
+        device: B,
+        // time_manager: T,
         partition_start_sector: u32,
     ) -> Result<Self> {
-        let full_ebpb = Self::read_fullebpb(&mut device, partition_start_sector)?;
-        Self::new_with_ebpb(device, partition_start_sector, full_ebpb)
+        let no_op = TimeManagerNoop::new();
+        Self::new_tm(device, partition_start_sector, no_op)
     }
 
-    pub fn read_fullebpb<B: BlockDevice>(
+    #[cfg(feature = "std")]
+    // chronos will be used as a time manager.
+    pub fn new<B: BlockDevice + 'static>(device: B, partition_start_sector: u32) -> Result<Self> {
+        let no_op = TimeManagerNoop::new();
+        Self::new_tm(device, partition_start_sector, no_op)
+    }
+
+    pub fn new_tm<B: BlockDevice + 'static>(
+        mut device: B,
+        partition_start_sector: u32,
+        time_manager: impl TimeManagerTrait + 'static,
+    ) -> Result<Self> {
+        let time_manager = Arc::new(time_manager);
+        let full_ebpb = Self::read_fullebpb(&mut device, partition_start_sector)?;
+        Self::new_with_ebpb(device, partition_start_sector, full_ebpb, time_manager)
+    }
+
+    pub fn read_fullebpb<B: BlockDevice + 'static>(
         device: &mut B,
         start_sector: u32,
     ) -> Result<FullExtendedBIOSParameterBlock> {
@@ -61,6 +82,7 @@ impl VfatFS {
         mut device: B,
         partition_start_sector: u32,
         full_ebpb: FullExtendedBIOSParameterBlock,
+        time_manager: Arc<dyn TimeManagerTrait>,
     ) -> Result<Self> {
         let fat_start_sector =
             (partition_start_sector + full_ebpb.bpb.reserved_sectors as u32).into();
@@ -94,6 +116,7 @@ impl VfatFS {
             root_cluster,
             eoc_marker,
             sectors_per_fat,
+            time_manager,
         })
     }
 
@@ -285,10 +308,11 @@ impl VfatFS {
 mod test {
     use std::sync::Arc;
 
-    use crate::io::Write;
-
     use crate::fat_table::FAT_ENTRY_SIZE;
-    use crate::{BlockDevice, CachedPartition, ClusterId, Result, SectorId, VfatFS};
+    use crate::io::Write;
+    use crate::{
+        BlockDevice, CachedPartition, ClusterId, Result, SectorId, TimeManagerNoop, VfatFS,
+    };
 
     pub struct ArrayBackedBlockDevice {
         pub arr: Vec<u8>,
@@ -359,6 +383,7 @@ mod test {
             sectors_per_fat: 1,
             root_cluster: ClusterId::new(0),
             eoc_marker: Default::default(),
+            time_manager: TimeManagerNoop::new_arc(),
         };
         assert_eq!(
             vfat.find_free_cluster().unwrap().unwrap(),

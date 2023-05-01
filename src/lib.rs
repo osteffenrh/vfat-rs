@@ -52,3 +52,37 @@ const EBPF_VFAT_MAGIC_ALT: u8 = 0x29;
 /// Why Arc? Because CachedPartition owns the block device. And
 /// Vfat needs to be cloned, and potentially we could send references across threads.
 type ArcMutex<CachedPartition> = Arc<CachedPartition>;
+
+pub use traits::{TimeManagerNoop, TimeManagerTrait};
+pub mod traits {
+    use crate::api::timestamp::VfatTimestamp;
+    use alloc::sync::Arc;
+    use core::fmt::Debug;
+
+    // An interface to the OS-owned timer. Needed for timestamping file creations and update.
+    pub trait TimeManagerTrait: Debug {
+        /// Get the current Unix timestamp in milliseconds.
+        /// The number of milliseconds since January 1, 1970, 00:00:00 UTC
+        fn get_current_timestamp_millis(&self) -> u64;
+        fn get_current_vfat_timestamp(&self) -> VfatTimestamp {
+            // TODO:
+            VfatTimestamp::new(0)
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct TimeManagerNoop {}
+    impl TimeManagerNoop {
+        pub fn new() -> Self {
+            Self {}
+        }
+        pub fn new_arc() -> Arc<Self> {
+            Arc::new(Self {})
+        }
+    }
+    impl TimeManagerTrait for TimeManagerNoop {
+        fn get_current_timestamp_millis(&self) -> u64 {
+            0
+        }
+    }
+}
