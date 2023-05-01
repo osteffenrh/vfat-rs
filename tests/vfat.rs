@@ -42,9 +42,10 @@ fn init_vfat() -> vfat_rs::Result<VfatFS> {
     VfatFS::new(dev, master_boot_record.partitions[0].start_sector)
 }
 
+/// Returns name and path
 fn random_name(prefix: &str) -> (String, String) {
     let mut rng = rand::thread_rng();
-    let random_suffix: u32 = rng.gen_range(1..999);
+    let random_suffix: u32 = rng.gen_range(1..999999);
     let name = format!("{}-{}.txt", prefix, random_suffix);
     let path = format!("/{}", name);
     (name, path)
@@ -262,6 +263,33 @@ fn test_file_creation() -> vfat_rs::Result<()> {
 
     // 4. try to create another file with the same name should fail.
     root.create_file(file_name.into()).unwrap_err();
+
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn test_multiple_file_creation() -> vfat_rs::Result<()> {
+    // test entry creation that needs multiple clusters allocated to this directory
+
+    let mut vfat = init_vfat()?;
+    let mut root = vfat.get_root()?;
+    let mut files = (0..100)
+        .map(|_| random_name("test_multiple_file_creation"))
+        .collect::<Vec<(String, String)>>();
+    files.sort();
+    files.dedup();
+
+    for (file_name, file_path) in files.clone() {
+        root.create_file(file_name).expect("Cannote create file");
+        assert!(vfat.path_exists(file_path.into())?);
+    }
+
+    // let's also cleanup:
+    for (file_name, file_path) in files {
+        root.delete(file_name).expect("Cannote delete file");
+        assert!(!vfat.path_exists(file_path.into())?);
+    }
 
     Ok(())
 }
