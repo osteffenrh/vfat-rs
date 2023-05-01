@@ -55,7 +55,7 @@ macro_rules! defbit {
     ($regname:ident) => { defbit!($regname, u64, []); };
     ($regname:ident, $size:ident, [$($field:ident $bits:tt,)*]) => {
         #[allow(non_snake_case)]
-        #[derive(Debug, Copy, Clone)]
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
         #[repr(C)]
         pub struct $regname ($size);
         #[allow(dead_code)]

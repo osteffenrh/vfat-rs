@@ -15,7 +15,7 @@ use crate::{
     RegularDirectoryEntry, SectorId, UnknownDirectoryEntry, VfatDirectoryEntry, VfatEntry,
     VfatRsError, EBPF_VFAT_MAGIC, EBPF_VFAT_MAGIC_ALT,
 };
-use crate::{Path, TimeManagerNoop, TimeManagerTrait};
+use crate::{Path, TimeManagerTrait};
 
 #[derive(Clone)]
 pub struct VfatFS {
@@ -47,15 +47,15 @@ impl VfatFS {
         // time_manager: T,
         partition_start_sector: u32,
     ) -> Result<Self> {
-        let no_op = TimeManagerNoop::new();
+        let no_op = crate::traits::TimeManagerNoop::new();
         Self::new_tm(device, partition_start_sector, no_op)
     }
 
     #[cfg(feature = "std")]
     // chronos will be used as a time manager.
     pub fn new<B: BlockDevice + 'static>(device: B, partition_start_sector: u32) -> Result<Self> {
-        let no_op = TimeManagerNoop::new();
-        Self::new_tm(device, partition_start_sector, no_op)
+        let chronos_tm = crate::traits::TimeManagerChronos::new();
+        Self::new_tm(device, partition_start_sector, chronos_tm)
     }
 
     pub fn new_tm<B: BlockDevice + 'static>(

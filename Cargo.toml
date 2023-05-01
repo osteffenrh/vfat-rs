@@ -11,7 +11,7 @@ opt-level = 2
 
 [features]
 default = []
-std = ["snafu/std", "binrw/std"]
+std = ["snafu/std", "binrw/std", "chrono/std"]
 
 [[example]]
 name = "simple"
@@ -25,6 +25,7 @@ binrw = {version = "~0.11", default-features = false}
 regex = "1.4.6"
 uluru = "3.0.0"
 spin = "0.9.4"
+chrono = {version = "~0.4", optional = true, default-features = false}
 
 [dev-dependencies]
 env_logger = "~0.10"
