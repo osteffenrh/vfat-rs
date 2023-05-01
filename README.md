@@ -2,16 +2,14 @@
 A simple VFAT implementation written in rust, and mostly tested against Linux's vfat driver.
 
 ## no_std
-This component was first developed with no_std in mind. `std` is still not yet supported.
+This component was first developed with no_std in mind. `std` is mostly supported behind a feature flag. 
+Check example/simple.rs for a usage example.
 
 ## Run example
-to run the example, first create a vfat fs using tests/setup.sh, then run the example file using:
+To run the example, first create a vfat fs using tests/setup.sh, then run the example file using:
 ```bash
-cargo run --example simple
+cargo run --example simple --feature std
 ```
-
-## More info:
-* Exfat specification: https://docs.microsoft.com/en-us/windows/win32/fileio/exfat-specification#1-introduction
 
 ## Testing
 All tests runs on same filesystem, and test shall not happen in parallel (for now!).
@@ -46,7 +44,6 @@ Check the changes:
 sudo dosfsck -w -r -l -v -r /dev/loop13
 ```
 
-
 ---
 
 ### TODO
@@ -63,7 +60,7 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
 ### Future improvements.
 * Currently, the device mutex is shared behind an ARC reference. Maybe, also having the whole FS behind arc would save quite some space when
   returning files and directories. Because they get a copy of the Vfat struct.
-* Get rid of alloc dependency? -> only used for String support rn.
+* Get rid of alloc dependency? It's mostly used for String support rn.
 
 ### FAQ
 * What happens if I have a "File" handle and meanwhile someone deletes this file and
@@ -71,9 +68,11 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
   This case should be taken care of by the application using this library.
 
 
+--
 
-### Useful docs:
+## Useful docs:
 * https://www.win.tue.nl/~aeb/linux/fs/fat/fat-1.html
+* Exfat specification: https://docs.microsoft.com/en-us/windows/win32/fileio/exfat-specification#1-introduction
 
 ---
 
