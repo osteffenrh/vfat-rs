@@ -264,7 +264,7 @@ impl VfatFS {
             .into_regular()
             .filter(|regular| regular.is_volume_id())
             .ok_or_else(|| {
-                binrw::io::Error::new(binrw::io::ErrorKind::NotFound, "Volume id not found?!")
+                crate::io::Error::new(crate::io::ErrorKind::NotFound, "Volume id not found?!")
             })?;
 
         let metadata = Metadata::new(
