@@ -19,7 +19,8 @@ mod common;
    would end up to just have them running in serial, I preferred to just go ahead and use `serial_test` crate.
 */
 fn init() -> (FilebackedBlockDevice, MasterBootRecord) {
-    std::env::set_var("RUST_LOG", "debug");
+    // If this is set to debug, for stress tests this produces a lot of logs that can cause OOM kill.
+    std::env::set_var("RUST_LOG", "error");
     let _ = env_logger::builder().is_test(true).try_init();
     let path = common::setup();
     let mut fs = FilebackedBlockDevice {
@@ -275,8 +276,7 @@ fn test_multiple_file_creation() -> vfat_rs::Result<()> {
     let mut vfat = init_vfat()?;
     let mut root = vfat.get_root()?;
 
-    // todo: if I use 1000 instead of 100, it's not able to complete due to Ram constraints O_o
-    let mut files = (0..100)
+    let mut files = (0..200)
         .map(|_| random_name("test_multiple_file_creation"))
         .collect::<Vec<(String, String)>>();
     files.sort();
