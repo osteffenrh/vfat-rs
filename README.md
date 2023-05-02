@@ -1,25 +1,25 @@
 # VFAT / FAT32
 A simple VFAT implementation written in rust, and mostly tested against Linux's vfat driver.
 
+It aims to be simple to understand and easy to use in a custom kernel.
+
 ## no_std
 This component was first developed with no_std in mind. `std` is mostly supported behind a feature flag. 
 Check example/simple.rs for a usage example.
 
 ## Run example
-To run the example, first create a vfat fs using tests/setup.sh, then run the example file using:
+To run the example, first create a vfat fs using tests/setup.sh then run the example file using:
 ```bash
 cargo run --example simple --feature std
 ```
 
 ## Testing
-All tests runs on same filesystem, and test shall not happen in parallel (for now!).
-
 To run the setup.sh script, I've added an exception for my user in the sudoers file:
 ```
 fponzi ALL=(ALL) NOPASSWD: /usr/bin/mount,/usr/bin/umount
 ```
 On github actions (CI) it just works, because the user has passwordless sudo.
-
+Then all tests can be run with `cargo test`. Each test in vfat.rs will create and delete a vfat filesystem. 
 
 ### Utils:
 You can check whether the file contains a valid MBR via `gdisk`:
@@ -48,8 +48,6 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
 
 ### TODO
 * Have a better update entry which allows to support renaming.
-* Find a way to get a "timestamp" function in the fs.
-* Add error type
 * Test: What happens if there are no free clusters (memory is full)?
 
 ## Long todo:

@@ -6,10 +6,10 @@ mod common;
 
 #[test]
 fn test_mbr_reader() {
-    common::setup();
-    let _fs_path = common::setup();
-    let fs_path = "/tmp/irisos_fat32/fat32.fs";
-    let mut f = File::open(fs_path).expect("File not found");
+    let vfatfs_randompath = common::setup();
+    //let fs_path = "/tmp/irisos_fat32/fat32.fs";
+    println!("Fs path: {:?}", vfatfs_randompath);
+    let mut f = File::open(&vfatfs_randompath.fs_path).expect("File not found");
     let mut buf = [0u8; 512];
     f.read_exact(&mut buf).expect("Cannot read!");
 
@@ -21,5 +21,5 @@ fn test_mbr_reader() {
         first_part.bootable_indicator_flag,
         mbr::BOOTABLE_PARTITION_FLAG
     );
-    common::purge_fs().unwrap();
+    drop(vfatfs_randompath);
 }

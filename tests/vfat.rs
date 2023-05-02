@@ -6,6 +6,7 @@ use log::info;
 use rand::Rng;
 use serial_test::serial;
 
+use crate::common::VfatFsRandomPath;
 use block_devs::FilebackedBlockDevice;
 use vfat_rs::mbr::MasterBootRecord;
 use vfat_rs::{mbr, BlockDevice, Path, SectorId, VfatFS};
@@ -18,29 +19,30 @@ mod common;
    one is supposed to have one instance per device). Because wrapping the VFAT instance into a mutex
    would end up to just have them running in serial, I preferred to just go ahead and use `serial_test` crate.
 */
-fn init() -> (FilebackedBlockDevice, MasterBootRecord) {
+fn init() -> (FilebackedBlockDevice, MasterBootRecord, VfatFsRandomPath) {
     // If this is set to debug, for stress tests this produces a lot of logs that can cause OOM kill.
     std::env::set_var("RUST_LOG", "error");
     let _ = env_logger::builder().is_test(true).try_init();
-    let path = common::setup();
+    let vfatfs_randompath = common::setup();
     let mut fs = FilebackedBlockDevice {
         image: OpenOptions::new()
             .read(true)
             .write(true)
-            .open(path)
+            .open(&vfatfs_randompath.fs_path)
             .unwrap(),
     };
     let mut buf = [0; 512];
     // MBR is always located in sector 0 of the disk
     fs.read_sector(SectorId(0), &mut buf).unwrap();
     let master_boot_record = MasterBootRecord::from(buf);
-    (fs, master_boot_record)
+    (fs, master_boot_record, vfatfs_randompath)
 }
 
-fn init_vfat() -> vfat_rs::Result<VfatFS> {
-    let (dev, master_boot_record) = init();
+fn init_vfat() -> vfat_rs::Result<(VfatFS, VfatFsRandomPath)> {
+    let (dev, master_boot_record, vfatfs_randompath) = init();
     //info!("start: {:#?}", master_boot_record);
     VfatFS::new(dev, master_boot_record.partitions[0].start_sector)
+        .map(|fs| (fs, vfatfs_randompath))
 }
 
 /// Returns name and path
@@ -53,9 +55,8 @@ fn random_name(prefix: &str) -> (String, String) {
 }
 
 #[test]
-#[serial]
 fn test_read_bios_parameter_block() {
-    let (mut dev, master_boot_record) = init();
+    let (mut dev, master_boot_record, vfatfs_randompath) = init();
 
     assert_eq!(
         master_boot_record.valid_bootsector_sign,
@@ -71,9 +72,8 @@ fn test_read_bios_parameter_block() {
 }
 
 #[test]
-#[serial]
 fn test_read_file() -> vfat_rs::Result<()> {
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let expected_content = "Hello, Iris OS!".to_string();
     let mut file = vfat.get_path("/hello.txt".into())?.into_file().unwrap();
     let mut buf = [0; 512];
@@ -151,7 +151,6 @@ To eat the world's due, by the grave and thee.
 }
 
 #[test]
-#[serial]
 fn test_path() {
     init();
     let expected = "//folder/something";
@@ -170,11 +169,10 @@ fn test_path() {
 }
 
 #[test]
-#[serial]
 fn test_get_path() -> vfat_rs::Result<()> {
     use vfat_rs::VfatMetadataTrait;
 
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     vfat.get_path("/not-found.txt".into()).unwrap_err();
     let file = vfat.get_path("/hello.txt".into()).unwrap();
     let local: DateTime<Local> = Local::now();
@@ -191,11 +189,10 @@ fn test_get_path() -> vfat_rs::Result<()> {
     Ok(())
 }
 #[test]
-#[serial]
 fn test_list_directory() -> vfat_rs::Result<()> {
     use vfat_rs::VfatMetadataTrait;
 
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     assert_eq!(
         vfat.get_root()?
             .contents()?
@@ -219,9 +216,8 @@ fn test_list_directory() -> vfat_rs::Result<()> {
 }
 
 #[test]
-#[serial]
 fn test_get_root() -> vfat_rs::Result<()> {
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let entry = vfat.get_root().unwrap();
     //assert_eq!(entry.metadata.path(), entry.metadata.name());
     //assert_eq!(entry.metadata.path(), "/");
@@ -230,24 +226,21 @@ fn test_get_root() -> vfat_rs::Result<()> {
 }
 
 #[test]
-#[serial]
 fn test_write_side_short() -> vfat_rs::Result<()> {
     test_file_write("fl")
 }
 
 #[test]
-#[serial]
 fn test_file_write_long() -> vfat_rs::Result<()> {
     test_file_write("a-very-long-file-name")
 }
 
 #[test]
-#[serial]
 fn test_file_creation() -> vfat_rs::Result<()> {
     let file_name = "hello_world";
     let used_name_path = "/hello_world";
 
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let mut root = vfat.get_root()?;
 
     // 2. assert file does not exists
@@ -269,11 +262,10 @@ fn test_file_creation() -> vfat_rs::Result<()> {
 }
 
 #[test]
-#[serial]
 fn test_multiple_file_creation() -> vfat_rs::Result<()> {
     // test entry creation that needs multiple clusters allocated to this directory
 
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let mut root = vfat.get_root()?;
 
     let mut files = (0..200)
@@ -298,7 +290,7 @@ fn test_multiple_file_creation() -> vfat_rs::Result<()> {
 
 fn test_file_write(name: &str) -> vfat_rs::Result<()> {
     let (file_name, file_path) = random_name(name);
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let mut root = vfat.get_root()?;
 
     // 2. assert file does not exists
@@ -375,7 +367,7 @@ pub fn convert(num: f64) -> String {
 
 #[ignore]
 #[test]
-#[serial]
+
 fn test_big_write_and_read() -> vfat_rs::Result<()> {
     // Write and read back a big file
     // The file size will be ITERATIONS * CONTENT.len()
@@ -385,7 +377,7 @@ fn test_big_write_and_read() -> vfat_rs::Result<()> {
         convert(ITERATIONS as f64 * CONTENT.len() as f64)
     );
     let (file_name, file_path) = random_name("big_write");
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let mut root = vfat.get_root()?;
 
     // 2. assert file does not exists
@@ -431,20 +423,20 @@ fn test_big_write_and_read() -> vfat_rs::Result<()> {
 }
 
 #[test]
-#[serial]
+
 fn test_create_directory_long() -> vfat_rs::Result<()> {
     test_create_directory("some-uncommonly-long-folder-name")
 }
 
 #[test]
-#[serial]
+
 fn test_create_directory_short() -> vfat_rs::Result<()> {
     test_create_directory("fld")
 }
 
 fn test_create_directory(prefix: &str) -> vfat_rs::Result<()> {
     let (dir_name, dir_path) = random_name(prefix);
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let mut root = vfat.get_root()?;
 
     let err = format!("Directory '{}' already exists. Please delete it.", dir_path);
@@ -471,10 +463,10 @@ fn test_create_directory(prefix: &str) -> vfat_rs::Result<()> {
 }
 
 #[test]
-#[serial]
+
 fn test_delete_folder_non_empty() -> vfat_rs::Result<()> {
     let (folder_name, _folder_path) = random_name("delfld");
-    let mut vfat = init_vfat()?;
+    let (mut vfat, _f) = init_vfat()?;
     let mut root = vfat.get_root()?;
     let mut folder = root.create_directory(folder_name.clone())?;
     let (subfolder_name, _subfolder_path) = random_name("subfld");
@@ -491,7 +483,7 @@ fn test_delete_folder_non_empty() -> vfat_rs::Result<()> {
 
 #[ignore]
 #[test]
-#[serial]
+
 fn test_stress() -> vfat_rs::Result<()> {
     // TODO: stress file creation
     Ok(())

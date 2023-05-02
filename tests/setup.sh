@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
+set -e
 ## Creates a new vfat fs on a file.
 ## creates mbr, mounts the fs, write files and directory and umount it.
+
+temp_dir="/tmp/irisos_fat32"
+diskimg=fat32.fs
+
+temp_dir="${1:-$temp_dir}"
+echo $temp_dir, $1, temp_dir;
+
+random_name="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10)"
 
 set -e
 # FS size in megabytes:
@@ -11,10 +20,6 @@ size=$((${fs_size}*(1<<20)))
 alignment=$((1<<20))
 # ceil(size, 1MB):
 size=$(( (size + alignment - 1)/alignment * alignment ))
-
-# TODO: randomize.
-temp_dir=/tmp/irisos_fat32/
-diskimg=fat32.fs
 
 echo "setup.sh: going to create an fs in ${temp_dir}${diskimg}";
 
@@ -43,12 +48,13 @@ parted -s --align optimal "${diskimg}"\
   set 1 boot on
 
 # Cleanup unneeded fat section
-rm -fv ${temp_dir}fat32.fs.fat
+rm -fv ${temp_dir}/fat32.fs.fat
 
 #####################
 ######### Write test files
 # 1. Mount the FS:
-dest="/tmp/testmount/"
+random_suffix="$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10)"
+dest="/tmp/irisos_vfat_testmount${random_suffix}/"
 mkdir -p $dest
 sudo mount -o loop,offset=$((2048*512)),uid=1000,gid=1000,dmask=0000,fmask=0001 fat32.fs $dest
 
@@ -81,8 +87,9 @@ echo 'Hello, Iris OS!' > ${dest}hello.txt
 
 # exit from the mounted fs:
 cd /tmp
+ls -l ${dest}
 
 ## Then unmount the fs, to flush disk writes.
 exec sudo umount $dest
-
+rm ${temp_dir}
 echo "created fs: ${temp_dir}${diskimg}"
