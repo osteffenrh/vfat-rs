@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Local};
+use chrono::{DateTime, Datelike, Local, Utc};
 use std::fs::OpenOptions;
 use vfat_rs::io::{SeekFrom, Write};
 
@@ -175,7 +175,10 @@ fn test_get_path() -> vfat_rs::Result<()> {
     let (mut vfat, _f) = init_vfat()?;
     vfat.get_path("/not-found.txt".into()).unwrap_err();
     let file = vfat.get_path("/hello.txt".into()).unwrap();
-    let local: DateTime<Local> = Local::now();
+    let local: DateTime<Utc> = Utc::now();
+
+    // these are add by the local os's vfat implementation
+    // during vfat fs setup
     assert_eq!(file.creation().year(), local.year() as u32);
     assert_eq!(file.creation().month(), local.month());
     assert_eq!(file.creation().day(), local.day());
