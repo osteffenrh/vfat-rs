@@ -25,6 +25,8 @@ impl Drop for VfatFsRandomPath {
         assert!(dir.is_dir());
         assert!(dir.starts_with("/tmp/"));
 
+        println!("removing dir: {}", dir.display());
+
         fs::remove_file(self.fs_path.clone()).unwrap();
         fs::remove_dir(dir).unwrap();
     }
@@ -62,15 +64,4 @@ pub fn setup() -> VfatFsRandomPath {
     VfatFsRandomPath {
         fs_path: random_dir_path,
     }
-}
-
-#[allow(dead_code)]
-pub fn purge_fs(fs_path: PathBuf) -> io::Result<()> {
-    let dir = fs_path.parent().unwrap().to_path_buf();
-    assert!(dir.is_dir());
-    assert!(dir.starts_with("/tmp/"));
-
-    fs::remove_file(fs_path).unwrap();
-    fs::remove_dir(dir).unwrap();
-    Ok(())
 }

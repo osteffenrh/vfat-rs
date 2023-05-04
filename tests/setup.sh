@@ -87,9 +87,8 @@ echo 'Hello, Iris OS!' > ${dest}hello.txt
 
 # exit from the mounted fs:
 cd /tmp
-ls -l ${dest}
 
 ## Then unmount the fs, to flush disk writes.
-exec sudo umount $dest
-rm ${temp_dir}
+sudo umount "$dest"
+rmdir "${dest}"
 echo "created fs: ${temp_dir}${diskimg}"
