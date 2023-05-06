@@ -222,8 +222,11 @@ fn test_list_directory() -> vfat_rs::Result<()> {
 fn test_get_root() -> vfat_rs::Result<()> {
     let (mut vfat, _f) = init_vfat()?;
     let entry = vfat.get_root().unwrap();
-    //assert_eq!(entry.metadata.path(), entry.metadata.name());
-    //assert_eq!(entry.metadata.path(), "/");
+    assert_eq!(
+        entry.metadata.path().display().to_string(),
+        entry.metadata.name()
+    );
+    assert_eq!(entry.metadata.path().display().to_string(), "/");
     info!("Entry:{:?}", entry);
     Ok(())
 }
