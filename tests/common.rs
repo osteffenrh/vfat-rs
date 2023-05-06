@@ -24,9 +24,6 @@ impl Drop for VfatFsRandomPath {
         let dir = self.fs_path.parent().unwrap().to_path_buf();
         assert!(dir.is_dir());
         assert!(dir.starts_with("/tmp/"));
-
-        println!("removing dir: {}", dir.display());
-
         fs::remove_file(self.fs_path.clone()).unwrap();
         fs::remove_dir(dir).unwrap();
     }
@@ -49,15 +46,14 @@ pub fn setup() -> VfatFsRandomPath {
             e
         ),
     }
-    println!("Running setup script...");
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("tests/setup.sh");
-    let output = Command::new("bash")
+    let _output = Command::new("bash")
         .arg(d.display().to_string().as_str())
         .arg(random_dir_path.display().to_string().as_str())
         .output()
         .expect("failed to execute setup script.");
-    println!("Setup script output: {:?}", output);
+    // println!("Setup script output: {:?}", output);
 
     random_dir_path.push("fat32.fs");
 

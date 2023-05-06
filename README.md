@@ -51,7 +51,6 @@ sudo dosfsck -w -r -l -v -r /dev/loop13
 * Test: What happens if there are no free clusters (memory is full)?
 
 ## Long todo:
-* Support longer files (rn it just creates 1 lfn per entry).
 * Write to backup FAT as well.
 * Free cluster summary update when allocating clusters.
 

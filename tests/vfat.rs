@@ -21,7 +21,7 @@ mod common;
 */
 fn init() -> (FilebackedBlockDevice, MasterBootRecord, VfatFsRandomPath) {
     // If this is set to debug, for stress tests this produces a lot of logs that can cause OOM kill.
-    std::env::set_var("RUST_LOG", "error");
+    std::env::set_var("RUST_LOG", "debug");
     let _ = env_logger::builder().is_test(true).try_init();
     let vfatfs_randompath = common::setup();
     let mut fs = FilebackedBlockDevice {
@@ -235,7 +235,8 @@ fn test_write_side_short() -> vfat_rs::Result<()> {
 
 #[test]
 fn test_file_write_long() -> vfat_rs::Result<()> {
-    test_file_write("a-very-long-file-name")
+    test_file_write("a-very-long-file-name")?;
+    test_file_write("a-very-long-file-name-but-one-which-is-very-very-long")
 }
 
 #[test]

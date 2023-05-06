@@ -225,7 +225,6 @@ impl VfatDirectoryEntry {
     // Even if there is a perfect fit for a RegularFileEntry, Linux creates a new
     // LongFileName nevertheless. I assume the reason for this is because of different
     // char encoding. LFN uses a subset of utf-16 while RegularFileEntry uses ASCII.
-    /// TODO: Support longer filenames.. Now it only creates 1 lfn
     pub(crate) fn new_vfat_entry(
         name: &str,
         cluster_id: ClusterId,
